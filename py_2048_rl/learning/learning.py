@@ -7,7 +7,7 @@ from __future__ import print_function
 import sys
 import os
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
 import numpy as np
 
 from py_2048_rl.game import play
@@ -47,11 +47,11 @@ def run_training(train_dir):
 
   resume = os.path.exists(train_dir)
 
-  with tf.Graph().as_default():
+  with tf1.Graph().as_default():
     model = FeedModel()
-    saver = tf.train.Saver()
-    session = tf.Session()
-    summary_writer = tf.summary.FileWriter(train_dir,
+    saver = tf1.train.Saver()
+    session = tf1.Session()
+    summary_writer = tf1.summary.FileWriter(train_dir,
                                            graph_def=session.graph_def,
                                            flush_secs=10)
 
@@ -113,4 +113,4 @@ def main(args):
 
 
 if __name__ == '__main__':
-  tf.app.run()
+  tf1.app.run()

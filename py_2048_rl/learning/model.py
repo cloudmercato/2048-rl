@@ -3,7 +3,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
 
 
 NUM_TILES = 16
@@ -12,8 +12,8 @@ NUM_ACTIONS = 4
 # Number of hidden units in each hidden layer
 HIDDEN_SIZES = [256, 256]
 
-OPTIMIZER_CLASS = tf.train.AdamOptimizer
-ACTIVATION_FUNCTION = tf.nn.relu
+OPTIMIZER_CLASS = tf1.train.AdamOptimizer
+ACTIVATION_FUNCTION = tf1.nn.relu
 WEIGHT_INIT_SCALE = 0.01
 
 # Learning Rate Parameters
@@ -26,10 +26,10 @@ class FeedModel(object):
   """Class to construct and collect all relevant tensors of the model."""
 
   def __init__(self):
-    self.state_batch_placeholder = tf.placeholder(
-        tf.float32, shape=(None, NUM_TILES))
-    self.targets_placeholder = tf.placeholder(tf.float32, shape=(None,))
-    self.actions_placeholder = tf.placeholder(tf.int32, shape=(None,))
+    self.state_batch_placeholder = tf1.placeholder(
+        tf1.float32, shape=(None, NUM_TILES))
+    self.targets_placeholder = tf1.placeholder(tf1.float32, shape=(None,))
+    self.actions_placeholder = tf1.placeholder(tf1.int32, shape=(None,))
     self.placeholders = (self.state_batch_placeholder,
                          self.targets_placeholder,
                          self.actions_placeholder)
@@ -42,15 +42,15 @@ class FeedModel(object):
     self.train_op, self.global_step, self.learning_rate = (
         build_train_op(self.loss))
 
-    tf.summary.scalar("Average Target",
-                      tf.reduce_mean(self.targets_placeholder))
-    tf.summary.scalar("Learning Rate", self.learning_rate)
-    tf.summary.scalar("Loss", self.loss)
-    tf.summary.histogram("States", self.state_batch_placeholder)
-    tf.summary.histogram("Targets", self.targets_placeholder)
+    tf1.summary.scalar("Average Target",
+                      tf1.reduce_mean(self.targets_placeholder))
+    tf1.summary.scalar("Learning Rate", self.learning_rate)
+    tf1.summary.scalar("Loss", self.loss)
+    tf1.summary.histogram("States", self.state_batch_placeholder)
+    tf1.summary.histogram("Targets", self.targets_placeholder)
 
-    self.init = tf.initialize_all_variables()
-    self.summary_op = tf.summary.merge_all()
+    self.init = tf1.initialize_all_variables()
+    self.summary_op = tf1.summary.merge_all()
 
 
 def build_inference_graph(state_batch, hidden_sizes):
@@ -109,16 +109,16 @@ def build_fully_connected_layer(name, input_batch, input_size, layer_size,
   Returns:
     The [batch_size, layer_size] output_batch Tensor.
   """
-  with tf.name_scope(name):
-    weights = tf.Variable(tf.truncated_normal([input_size, layer_size],
+  with tf1.name_scope(name):
+    weights = tf1.Variable(tf1.truncated_normal([input_size, layer_size],
                                               stddev=WEIGHT_INIT_SCALE),
                           name='weights')
-    biases = tf.Variable(tf.zeros([layer_size]), name='biases')
-    output_batch = activation_function(tf.matmul(input_batch, weights) + biases)
+    biases = tf1.Variable(tf1.zeros([layer_size]), name='biases')
+    output_batch = activation_function(tf1.matmul(input_batch, weights) + biases)
 
-    tf.summary.histogram("Weights " + name, weights)
-    tf.summary.histogram("Biases " + name, biases)
-    tf.summary.histogram("Activations " + name, output_batch)
+    tf1.summary.histogram("Weights " + name, weights)
+    tf1.summary.histogram("Biases " + name, biases)
+    tf1.summary.histogram("Activations " + name, output_batch)
 
     return weights, biases, output_batch
 
@@ -137,12 +137,12 @@ def build_loss(q_values, targets, actions):
     loss: Loss tensor of type float.
   """
   # Get Q-Value prodections for the given actions
-  batch_size = tf.shape(q_values)[0]
-  q_value_indices = tf.range(0, batch_size) * NUM_ACTIONS + actions
-  relevant_q_values = tf.gather(tf.reshape(q_values, [-1]), q_value_indices)
+  batch_size = tf1.shape(q_values)[0]
+  q_value_indices = tf1.range(0, batch_size) * NUM_ACTIONS + actions
+  relevant_q_values = tf1.gather(tf1.reshape(q_values, [-1]), q_value_indices)
 
   # Compute L2 loss (tf.nn.l2_loss() doesn't seem to be available on CPU)
-  return tf.reduce_mean(tf.pow(relevant_q_values - targets, 2))
+  return tf1.reduce_mean(tf1.pow(relevant_q_values - targets, 2))
 
 
 def build_train_op(loss):
@@ -154,8 +154,8 @@ def build_train_op(loss):
   Returns:
     train_op, global_step, learning_rate.
   """
-  global_step = tf.Variable(0, name='global_step', trainable=False)
-  learning_rate = tf.train.exponential_decay(
+  global_step = tf1.Variable(0, name='global_step', trainable=False)
+  learning_rate = tf1.train.exponential_decay(
       INIT_LEARNING_RATE, global_step, 100000, LR_DECAY_PER_100K)
 
   optimizer = OPTIMIZER_CLASS(learning_rate)
