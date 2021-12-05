@@ -34,6 +34,7 @@ class Agent():
     if "episode_db" not in self.__hash.keys():
       self.__hash["episode_db"] = episodes.EdpisodeDB(self.__hash["mem_size"],\
                                                       self.__hash["input_dims"])
+    self.__hash["last_game_score"] = 0
 
   def __create_default_model(self):
     model: tf2.keras.models.Sequential = tf2.keras.Sequential([
@@ -71,10 +72,12 @@ class Agent():
     for i in range(n_games):
       if i == 0: self.accumulate_episode_data()
       self.learn()
+      self.play_game(self.action_greedy_epsilon)
       if self.__hash["model_acuto_save"]: self.save_model()
       m1 = self.__hash["model"]
-      log.generic_output(field_names = ["Learning run", "Loss: "], \
-                            field_content = [i.__str__(), m1.losses.__str__()])
+      log.generic_output(field_names = ["Learning run", "Losses: ", "Last score: "], \
+                            field_content = [i.__str__(), m1.losses.__str__(), \
+                                             self.__hash["last_game_score"].__str__()])
 
 
   def accumulate_episode_data(self):
@@ -105,6 +108,8 @@ class Agent():
                          score=game1.score(),
                          done=game1.game_over()))
 
+    self.__hash["last_game_score"] = game1.score()
+
   def action_random(self, curr_game):
     return np.random.choice(curr_game.available_actions())
 
@@ -113,9 +118,11 @@ class Agent():
       return self.action_random(curr_game)
 
     state = curr_game.state()
+    state = np.matrix.reshape(state, (1, 16))
     m1 = self.__hash["model"]
     actions = m1.predict(state)
-    return tf2.argmax(actions)
+    actions = actions[0][curr_game.available_actions()]
+    return np.argmax(actions)
 
   def save_model(self):
     m1 = self.__hash["model"]
