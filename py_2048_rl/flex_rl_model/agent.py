@@ -2,24 +2,25 @@ import tensorflow as tf2
 import numpy as np
 import os
 import py_2048_rl.game.game as game
-import py_2048_rl.game.play as play
+import py_2048_rl.logging.logger as logger
 import episodes
 
 
 class Agent():
   def __init__(self, **kwargs):
     self.__hash = {}
-
+    self.__hash["mem_size"] = 10000
+    self.__hash["input_dims"] = [16]
     self.__hash["lr"] = 0.001
     self.__hash["gamma"] = 0.99
     self.__hash["n_actions"] = 4
     self.__hash["epsilon"] = 1
     self.__hash["batch_size"] = 10000
-    self.__hash["input_dims"] = 16
     self.__hash["epsilon_dec"] = 1e-3
     self.__hash["epsilon_min"] = 0.01
     self.__hash["mem_size"] = 1000000
     self.__hash["fname"] = 'model.h5'
+    self.__hash["model_acuto_save"] = True
 
     for k in kwargs.keys():
       self.__hash[k] = kwargs[k]
@@ -31,7 +32,8 @@ class Agent():
       self.__create_default_model()
 
     if "episode_db" not in self.__hash.keys():
-      self.__hash["episode_db"] = episodes.EdpisodeDB()
+      self.__hash["episode_db"] = episodes.EdpisodeDB(self.__hash["mem_size"],\
+                                                      self.__hash["input_dims"])
 
   def __create_default_model(self):
     model: tf2.keras.models.Sequential = tf2.keras.Sequential([
@@ -46,24 +48,39 @@ class Agent():
     self.accumulate_episode_data()
     ep_db = self.__hash["episode_db"]
     m1 = self.__hash["model"]
+
     states, states_, actions, rewards, dones = \
       ep_db.get_random_data_batch(self.__hash['batch_size'])
 
-    q_eval = tf2.Variable(tf2.constant(m1.predict(states)))
-    q_next = tf2.Variable(tf2.constant(m1.predict(states_)))
-    q_target = t2.Variable(q_eval)
-    batch_index = tf2.range(self.__hash['batch_size'])
-    q_target[batch_index, actions] = rewards + self.__hash["gamma"] * q_next.numpy().max(axis=1)*dones
+    q_eval = tf2.Variable(tf2.constant(m1.predict(states.numpy())))
+    q_next = tf2.Variable(tf2.constant(m1.predict(states_.numpy())))
+    q_target = q_eval.numpy()
+    batch_index = np.arange(self.__hash['batch_size'])
+    q_target[batch_index, actions] = rewards + self.__hash["gamma"] * \
+                                     np.max(q_next.numpy(), axis=(1)) * \
+                                     dones.numpy()
     m1.train_on_batch(states, q_target)
 
     # Adjust the epsilon
     self.__hash["epsilon"] = self.__hash["epsilon"]  - self.__hash["epsilon_dec"] \
       if self.__hash["epsilon"] >self.__hash["epsilon_min"] else self.__hash["epsilon_min"]
 
+  def learn_on_repeat(self, n_games=1):
+    log = logger.Logger()
+
+    for i in range(n_games):
+      if i == 0: self.accumulate_episode_data()
+      self.learn()
+      if self.__hash["model_acuto_save"]: self.save_model()
+      m1 = self.__hash["model"]
+      log.generic_output(field_names = ["Learning run", "Loss: "], \
+                            field_content = [i.__str__(), m1.losses.__str__()])
+
+
   def accumulate_episode_data(self):
     ep_db = self.__hash["episode_db"]
     while ep_db.mem_cntr < self.__hash["batch_size"]:
-      self.play_game()
+      self.play_game(self.action_random)
 
   def play_game(self, action_choice):
     game1 = game.Game()
@@ -77,15 +94,15 @@ class Agent():
 
     while not game1.game_over():
       action = action_choice(game1)
-      state = game1.state()
-      reward = game1.do_action()
-      state_ = game1.state()
+      state = np.matrix.flatten( game1.state() )
+      reward = game1.do_action(action)
+      state_ = np.matrix.flatten( game1.state() )
       e_db.store_episode(
         episodes.Episode(state=state,
-                         new_state=state_,
+                         next_state=state_,
                          action=action,
                          reward=reward,
-                         score=game.score(),
+                         score=game1.score(),
                          done=game1.game_over()))
 
   def action_random(self, curr_game):

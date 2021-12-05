@@ -13,9 +13,14 @@ class NN_Model(object):
   def __init__(self, **kwargs):
     self.__hash = {}
     self.__hash["layers_shape"] = [[16], [64], [64], [4]]
-    self.__hash["layers_activation_func"] = [None, tf2.keras.activations.mse,
-                                             tf2.keras.activations.mse, None]
-    self.__hash["default_activation_function"] = tf2.nn.relu
+    self.__hash["layers_activation_func"] = [None, tf2.keras.activations.relu,
+                                             tf2.keras.activations.relu, None]
+    self.__hash["layer_units"] = [16, 256, 256, 4]
+    self.__hash["layers_type"] = [tf2.keras.layers.Dense, tf2.keras.layers.Dense,
+                                  tf2.keras.layers.Dense,tf2.keras.layers.Dense]
+    self.__hash["optimizer"] = tf2.keras.optimizers.Adam
+    self.__hash["oss_function"] =  tf2.keras.losses.mse
+    self.__hash["learning_rate"] = 0.0001
     self.__hash["nn_type"] = "dqn"
     self.__hash["log_dir"] = "/app/logs"
 
@@ -30,22 +35,27 @@ class NN_Model(object):
     layers = tf2.keras.layers
     l_arr = []
     l =None
+    l_type = None
+    unit_dims = None
     m_shape = self.get_param("layers_shape")
-    act_func = self.get_param("default_activation_function")
+    act_func = None
 
     if len(m_shape) < 2: return None
 
     for i in range( len(self.get_param("layers_shape")) ):
-      if i == 0:
-        l = layers.Input(shape=m_shape[i])
-      elif i == len(m_shape) - 1:
-        l = layers.Output(shape=m_shape[i])
-      else:
-        l = layers.Dense(shape=m_shape[i], activation=act_func)
+      l_type = self.__hash["layers_type"][i]
+      act_func = self.__hash["layers_activation_func"][i]
+      unit_dims = self.__hash["layer_units"][i]
+      l = l_type(unit_dims, activation=act_func)
 
       l_arr.append(l)
 
-    return tf2.keras.model.Sequential(l_arr)
+    mod = tf2.keras.models.Sequential(l_arr)
+    opt = self.__hash["optimizer"]
+    loss = self.__hash["oss_function"]
+    mod.compile(optimizer=opt(learning_rate = self.__hash["learning_rate"]),\
+                loss=loss)
+    return mod
 
   def get_param(self, name):
     if name in self.__hash.keys(): return self.__hash[name]

@@ -2,19 +2,19 @@
 
 from py_2048_rl.learning.model import build_loss
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
 
 # pylint: disable=missing-docstring
 
 def test_loss():
-  q_values = tf.constant([[1, 2, 3, 0],
+  q_values = tf1.constant([[1, 2, 3, 0],
                           [4, 5, 6, 0],
-                          [7, 8, 9, 0]], dtype=tf.float32)
-  targets = tf.constant([4, 7, 12], dtype=tf.float32)
-  actions = tf.constant([2, 1, 0], dtype=tf.int32)
+                          [7, 8, 9, 0]], dtype=tf1.float32)
+  targets = tf1.constant([4, 7, 12], dtype=tf1.float32)
+  actions = tf1.constant([2, 1, 0], dtype=tf1.int32)
 
   loss_tensor = build_loss(q_values, targets, actions)
-  with tf.Session() as session:
+  with tf1.Session() as session:
     loss_value = session.run(loss_tensor)
 
   # The relevant q values are [3, 5, 7], the differences from the targets are
