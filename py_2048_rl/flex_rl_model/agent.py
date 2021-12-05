@@ -58,8 +58,7 @@ class Agent():
     q_target = q_eval.numpy()
     batch_index = np.arange(self.__hash['batch_size'])
     q_target[batch_index, actions] = rewards + self.__hash["gamma"] * \
-                                     np.max(q_next.numpy(), axis=(1)) * \
-                                     dones.numpy()
+                                     np.max(q_next.numpy(), axis=(1))
     m1.train_on_batch(states, q_target)
 
     # Adjust the epsilon
