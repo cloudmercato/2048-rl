@@ -36,7 +36,12 @@ class EdpisodeDB():
     self.new_states_mem.scatter_nd_update(ind_arr, tf2.constant(e.next_state, dtype=tf2.float32))
     self.action_mem.scatter_nd_update([ind], [e.action] )
     self.reward_mem.scatter_nd_update([ind], [e.reward] )
-    self.done_mem.scatter_nd_update([ind], [e.done])
+
+    # Special processing for boolean in done_mem
+    done_mem_np = self.done_mem.numpy()
+    done_mem_np[ind] = e.done
+    self.done_mem = tf2.Variable( tf2.constant(done_mem_np) )
+
     self.mem_cntr += 1
 
   def get_random_data_batch(self, batch_size):
