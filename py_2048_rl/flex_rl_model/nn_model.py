@@ -19,7 +19,7 @@ class NN_Model(object):
     self.__hash["layers_type"] = [tf2.keras.layers.Dense, tf2.keras.layers.Dense,
                                   tf2.keras.layers.Dense,tf2.keras.layers.Dense]
     self.__hash["optimizer"] = tf2.keras.optimizers.Adam
-    self.__hash["oss_function"] =  tf2.keras.losses.mse
+    self.__hash["loss_function"] =  tf2.keras.losses.mse
     self.__hash["learning_rate"] = 0.0001
     self.__hash["nn_type"] = "dqn"
     self.__hash["log_dir"] = "/app/logs"
@@ -52,7 +52,7 @@ class NN_Model(object):
 
     mod = tf2.keras.models.Sequential(l_arr)
     opt = self.__hash["optimizer"]
-    loss = self.__hash["oss_function"]
+    loss = self.__hash["loss_function"]
     mod.compile(optimizer=opt(learning_rate = self.__hash["learning_rate"]),\
                 loss=loss)
     return mod

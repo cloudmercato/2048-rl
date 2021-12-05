@@ -20,7 +20,8 @@ class Agent():
     self.__hash["epsilon_min"] = 0.01
     self.__hash["mem_size"] = 1000000
     self.__hash["fname"] = 'model.h5'
-    self.__hash["model_acuto_save"] = True
+    self.__hash["model_auto_save"] = True
+    self.__hash["log_dir"] = "/app/logs"
 
     for k in kwargs.keys():
       self.__hash[k] = kwargs[k]
@@ -36,6 +37,9 @@ class Agent():
                                                       self.__hash["input_dims"])
     self.__hash["last_game_score"] = 0
 
+    self.__hash["tensorboard_callback"] =\
+      tf2.keras.callbacks.TensorBoard(log_dir=self.__hash["log_dir"], histogram_freq=1)
+
   def __create_default_model(self):
     model: tf2.keras.models.Sequential = tf2.keras.Sequential([
       tf2.keras.layers.Dense(16, activation='relu'),
@@ -49,6 +53,7 @@ class Agent():
     self.accumulate_episode_data()
     ep_db = self.__hash["episode_db"]
     m1 = self.__hash["model"]
+    tbcb = self.__hash["tensorboard_callback"]
 
     states, states_, actions, rewards, dones = \
       ep_db.get_random_data_batch(self.__hash['batch_size'])
@@ -59,7 +64,7 @@ class Agent():
     batch_index = np.arange(self.__hash['batch_size'])
     q_target[batch_index, actions] = rewards + self.__hash["gamma"] * \
                                      np.max(q_next.numpy(), axis=(1))
-    m1.train_on_batch(states, q_target)
+    m1.fit(tf2.constant(states), q_target, callbacks=[tbcb])
 
     # Adjust the epsilon
     self.__hash["epsilon"] = self.__hash["epsilon"]  - self.__hash["epsilon_dec"] \
@@ -72,7 +77,7 @@ class Agent():
       if i == 0: self.accumulate_episode_data()
       self.learn()
       self.play_game(self.action_greedy_epsilon)
-      if self.__hash["model_acuto_save"]: self.save_model()
+      if self.__hash["model_auto_save"]: self.save_model()
       m1 = self.__hash["model"]
       log.generic_output(field_names = ["Learning run", "Losses: ", "Last score: "], \
                             field_content = [i.__str__(), m1.losses.__str__(), \
