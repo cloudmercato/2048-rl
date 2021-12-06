@@ -9,7 +9,7 @@ import episodes
 class Agent():
   def __init__(self, **kwargs):
     self.__hash = {}
-    self.__hash["mem_size"] = 10000
+    self.__hash["batch_size"] = 10000
     self.__hash["input_dims"] = [16]
     self.__hash["lr"] = 0.001
     self.__hash["gamma"] = 0.99
@@ -18,11 +18,11 @@ class Agent():
     self.__hash["batch_size"] = 10000
     self.__hash["epsilon_dec"] = 1e-3
     self.__hash["epsilon_min"] = 0.01
-    self.__hash["mem_size"] = 1000000
     self.__hash["fname"] = 'model.h5'
     self.__hash["model_auto_save"] = True
     self.__hash["log_dir"] = "/app/logs"
     self.__hash["tf_proc_debug"] = False
+    self.__hash["training_epochs"] = 1
 
     for k in kwargs.keys():
       self.__hash[k] = kwargs[k]
@@ -34,7 +34,7 @@ class Agent():
       self.__create_default_model()
 
     if "episode_db" not in self.__hash.keys():
-      self.__hash["episode_db"] = episodes.EdpisodeDB(self.__hash["mem_size"],\
+      self.__hash["episode_db"] = episodes.EdpisodeDB(self.__hash["batch_size"],\
                                                       self.__hash["input_dims"])
 
     self.__hash["last_game_score"] = 0
@@ -42,6 +42,8 @@ class Agent():
 
     self.__hash["tensorboard_callback"] =\
       tf2.keras.callbacks.TensorBoard(log_dir=self.__hash["log_dir"], histogram_freq=1)
+
+    self.__hash["training_histories"] = []
 
     tf2.debugging.set_log_device_placement(self.__hash["tf_proc_debug"])
 
@@ -69,7 +71,12 @@ class Agent():
     batch_index = np.arange(self.__hash['batch_size'])
     q_target[batch_index, actions] = rewards + self.__hash["gamma"] * \
                                      np.max(q_next.numpy(), axis=(1))
-    m1.fit(tf2.constant(states), q_target, callbacks=[tbcb])
+    history = m1.fit(tf2.constant(states),
+                     q_target,
+                     callbacks=[tbcb],
+                     epochs=self.__hash["training_epochs"])
+
+    self.__hash["training_histories"].append(history)
 
     # Adjust the epsilon
     self.__hash["epsilon"] = self.__hash["epsilon"]  - self.__hash["epsilon_dec"] \

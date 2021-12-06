@@ -26,7 +26,9 @@ class NN_Model(object):
     self.__hash["log_dir"] = "/app/logs"
     self.__hash["tf_model"] = None
     self.__hash["agent"] = None
+    self.__hash["batch_size"] = 1000
     self.__hash["training_epochs"] = 1
+    self.__hash["log_dir"] = "/app/logs"
     self.__hash["tf_proc_debug"] = False
 
     # Copy content in from the argument hash.
@@ -37,11 +39,11 @@ class NN_Model(object):
       self.__hash["tf_model"] = self.create_tf_model()
 
     if self.get_param("agent") is None:
-      self.__hash["agent"] = agent.Agent(model = self.__hash["tf_model"],
-                                         lr = self.__hash["lr"],
-                                         training_epochs = self.__hash["training_epochs"]
-
-                                         )
+      self.__hash["agent"] = agent.Agent(model=self.__hash["tf_model"],
+                                         batch_size=self.__hash["batch_size"],
+                                         lr=self.__hash["lr"],
+                                         log_dir=self.__hash["log_dir"],
+                                         tf_proc_debug=self.__hash["tf_proc_debug"])
 
     tf2.debugging.set_log_device_placement(self.__hash["tf_proc_debug"])
 
