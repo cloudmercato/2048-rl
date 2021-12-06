@@ -109,10 +109,12 @@ class Agent():
       log.generic_output(field_names = ["Learning run",
                                         "Min score",
                                         "Average score",
+                                        "Last score",
                                         "Max score"], \
                             field_content = [run_num.__str__(),
                                              min_score.__str__(),
                                              avg_score.__str__(),
+                                             self.__hash["last_game_score"].__str__(),
                                              max_score.__str__()])
 
 
