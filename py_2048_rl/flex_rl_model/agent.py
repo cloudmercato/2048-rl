@@ -16,7 +16,6 @@ class Agent():
     self.__hash["gamma"] = 0.99
     self.__hash["n_actions"] = 4
     self.__hash["epsilon"] = 1
-    self.__hash["batch_size"] = 10000
     self.__hash["epsilon_dec"] = 1e-3
     self.__hash["epsilon_min"] = 0.01
     self.__hash["fname"] = 'model.h5'

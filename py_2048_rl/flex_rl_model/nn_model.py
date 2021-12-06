@@ -22,6 +22,10 @@ class NN_Model(object):
     self.__hash["optimizer"] = tf2.keras.optimizers.Adam
     self.__hash["loss_function"] =  tf2.keras.losses.mse
     self.__hash["learning_rate"] = 0.0001
+    self.__hash["gamma"] = 0.99
+    self.__hash["epsilon"] = 1
+    self.__hash["epsilon_dec"] = 1e-3
+    self.__hash["epsilon_min"] = 0.01
     self.__hash["nn_type"] = "dqn"
     self.__hash["log_dir"] = "/app/logs"
     self.__hash["tf_model"] = None
@@ -44,6 +48,10 @@ class NN_Model(object):
                                          batch_size=self.__hash["batch_size"],
                                          lr=self.__hash["lr"],
                                          log_dir=self.__hash["log_dir"],
+                                         gamma=self.__hash["gamma"],
+                                         epsilon=self.__hash["epsilon"],
+                                         epsilon_dec=self.__hash["epsilon_dec"],
+                                         epsilon_min = self.__hash["epsilon_min"],
                                          tf_proc_debug=self.__hash["tf_proc_debug"])
 
     tf2.debugging.set_log_device_placement(self.__hash["tf_proc_debug"])
