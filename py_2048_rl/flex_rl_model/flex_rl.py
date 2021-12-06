@@ -8,7 +8,9 @@ if __name__ != "__main__":
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--learn_runs', type=int, default=100, help='Number of model learn runs')
-parser.add_argument('--batch_size', type=int, default=1000,
+parser.add_argument('--batch_size', type=int, default=10000,
+                    help='Training batch selection size (in number of episodes')
+parser.add_argument('--mem_size', type=int, default=50000,
                     help='Learning episode DB size (in number of episodes')
 parser.add_argument('--lr', type=float, default=0.0001,
                     help='Learning rate')

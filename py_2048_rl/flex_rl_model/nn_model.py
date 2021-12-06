@@ -26,7 +26,8 @@ class NN_Model(object):
     self.__hash["log_dir"] = "/app/logs"
     self.__hash["tf_model"] = None
     self.__hash["agent"] = None
-    self.__hash["batch_size"] = 1000
+    self.__hash["batch_size"] = 10000
+    self.__hash["mem_size"] = 50000
     self.__hash["training_epochs"] = 1
     self.__hash["log_dir"] = "/app/logs"
     self.__hash["tf_proc_debug"] = False

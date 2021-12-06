@@ -10,6 +10,7 @@ class Agent():
   def __init__(self, **kwargs):
     self.__hash = {}
     self.__hash["batch_size"] = 10000
+    self.__hash["mem_size"] = 50000
     self.__hash["input_dims"] = [16]
     self.__hash["lr"] = 0.001
     self.__hash["gamma"] = 0.99
@@ -34,7 +35,7 @@ class Agent():
       self.__create_default_model()
 
     if "episode_db" not in self.__hash.keys():
-      self.__hash["episode_db"] = episodes.EdpisodeDB(self.__hash["batch_size"],\
+      self.__hash["episode_db"] = episodes.EdpisodeDB(self.__hash["mem_size"],\
                                                       self.__hash["input_dims"])
 
     self.__hash["last_game_score"] = 0
@@ -119,8 +120,8 @@ class Agent():
     if ep_db.mem_cntr >= self.__hash["batch_size"]: return
 
     log = self.__hash["logger"]
-    log.freeform_output("Initial data accumulation. Batch size = " +
-                        self.__hash["batch_size"].__str__() +
+    log.freeform_output("Initial data accumulation. Collection size = " +
+                        self.__hash["mem_size"].__str__() +
                          " episodes.")
 
     while ep_db.mem_cntr < self.__hash["batch_size"]:
