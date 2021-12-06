@@ -2,6 +2,7 @@
 Neural Network model for RL analysis
 """
 import tensorflow as tf2
+import agent
 
 
 #--- BEGIN NN_Model ---
@@ -23,6 +24,10 @@ class NN_Model(object):
     self.__hash["learning_rate"] = 0.0001
     self.__hash["nn_type"] = "dqn"
     self.__hash["log_dir"] = "/app/logs"
+    self.__hash["tf_model"] = None
+    self.__hash["agent"] = None
+    self.__hash["training_epochs"] = 1
+    self.__hash["tf_proc_debug"] = False
 
     # Copy content in from the argument hash.
     for k in kwargs.keys():
@@ -30,6 +35,16 @@ class NN_Model(object):
 
     if self.get_param("tf_model") is None:
       self.__hash["tf_model"] = self.create_tf_model()
+
+    if self.get_param("agent") is None:
+      self.__hash["agent"] = agent.Agent(model = self.__hash["tf_model"],
+                                         lr = self.__hash["lr"],
+                                         training_epochs = self.__hash["training_epochs"]
+
+                                         )
+
+    tf2.debugging.set_log_device_placement(self.__hash["tf_proc_debug"])
+
 
   def create_tf_model(self):
     layers = tf2.keras.layers

@@ -22,6 +22,7 @@ class Agent():
     self.__hash["fname"] = 'model.h5'
     self.__hash["model_auto_save"] = True
     self.__hash["log_dir"] = "/app/logs"
+    self.__hash["tf_proc_debug"] = False
 
     for k in kwargs.keys():
       self.__hash[k] = kwargs[k]
@@ -35,10 +36,14 @@ class Agent():
     if "episode_db" not in self.__hash.keys():
       self.__hash["episode_db"] = episodes.EdpisodeDB(self.__hash["mem_size"],\
                                                       self.__hash["input_dims"])
+
     self.__hash["last_game_score"] = 0
+    self.__hash["logger"] = logger.Logger()
 
     self.__hash["tensorboard_callback"] =\
       tf2.keras.callbacks.TensorBoard(log_dir=self.__hash["log_dir"], histogram_freq=1)
+
+    tf2.debugging.set_log_device_placement(self.__hash["tf_proc_debug"])
 
   def __create_default_model(self):
     model: tf2.keras.models.Sequential = tf2.keras.Sequential([
@@ -71,23 +76,50 @@ class Agent():
       if self.__hash["epsilon"] >self.__hash["epsilon_min"] else self.__hash["epsilon_min"]
 
   def learn_on_repeat(self, n_games=1):
-    log = logger.Logger()
+    log = self.__hash["logger"]
+    min_score = 0
+    max_score = 0
+    avg_score = 0.0
+    sum_scores = 0
+    run_num = 0
 
     for i in range(n_games):
-      if i == 0: self.accumulate_episode_data()
       self.learn()
       self.play_game(self.action_greedy_epsilon)
       if self.__hash["model_auto_save"]: self.save_model()
-      m1 = self.__hash["model"]
-      log.generic_output(field_names = ["Learning run", "Losses: ", "Last score: "], \
-                            field_content = [i.__str__(), m1.losses.__str__(), \
-                                             self.__hash["last_game_score"].__str__()])
+
+      min_score = self.__hash["last_game_score"] if i == 0 \
+        else min(min_score, self.__hash["last_game_score"] )
+
+      max_score = max(max_score, self.__hash["last_game_score"] )
+      sum_scores += self.__hash["last_game_score"]
+      run_num = i+1
+      avg_score = sum_scores / run_num
+
+      log.generic_output(field_names = ["Learning run",
+                                        "Min score",
+                                        "Average score",
+                                        "Max score"], \
+                            field_content = [run_num.__str__(),
+                                             min_score.__str__(),
+                                             avg_score.__str__(),
+                                             max_score.__str__()])
 
 
   def accumulate_episode_data(self):
     ep_db = self.__hash["episode_db"]
+    # Bail if there's nothing to do.
+    if ep_db.mem_cntr >= self.__hash["batch_size"]: return
+
+    log = self.__hash["logger"]
+    log.freeform_output("Initial data accumulation. Batch size = " +
+                        self.__hash["batch_size"].__str__() +
+                         " episodes.")
+
     while ep_db.mem_cntr < self.__hash["batch_size"]:
       self.play_game(self.action_random)
+
+    log.freeform_output("Initial data accumulation completed.")
 
   def play_game(self, action_choice):
     game1 = game.Game()

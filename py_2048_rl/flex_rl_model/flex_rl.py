@@ -20,7 +20,7 @@ args = parser.parse_args()
 nn_mod = nn_model.NN_Model(lr=args.lr, log_dir=args.log_dir)
 
 agent = agent.Agent(model=nn_mod.get_param("tf_model"),
-                    mem_size=args.mem_size,
+                    batch_size=args.mem_size,
                     lr=args.lr,
                     log_dir=args.log_dir)
 

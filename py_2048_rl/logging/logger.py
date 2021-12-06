@@ -4,6 +4,10 @@ class Logger():
   def __init__(self, **kwargs):
     pass
 
+  def freeform_output(self, msg):
+    print("Timestamp: " + tf2.timestamp().numpy().__str__())
+    print(msg)
+
   def generic_output(self, **kwargs):
     if "field_names" not in kwargs.keys(): return
 
