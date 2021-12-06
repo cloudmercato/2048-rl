@@ -1,4 +1,5 @@
 numpy
 tensorflow
+tensorboard_plugin_profile
 pytest
 mock
