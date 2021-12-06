@@ -51,6 +51,10 @@ class Agent():
     self.__hash["training_histories"] = []
 
     tf2.debugging.set_log_device_placement(self.__hash["tf_proc_debug"])
+    if self.__hash["tf_proc_debug"]:
+      tf2.debugging.experimental.enable_dump_debug_info(self.__hash["log_dir"],
+                                                        tensor_debug_mode="FULL_HEALTH",
+                                                        circular_buffer_size=-1)
 
   def __create_default_model(self):
     model: tf2.keras.models.Sequential = tf2.keras.Sequential([
