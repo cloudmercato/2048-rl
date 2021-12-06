@@ -22,6 +22,11 @@ class Episode():
 
 class EdpisodeDB():
   def __init__(self, mem_size, input_dims, **kwargs):
+    self.__hash = {}
+    self.__hash["tf_proc_debug"] = False
+
+    for k in kwargs.keys(): self.__hash[k] = kwargs[k]
+
     self.mem_size = mem_size
     self.mem_cntr = 0
     states_dims = [mem_size]
@@ -33,6 +38,7 @@ class EdpisodeDB():
     self.done_mem = tf2.Variable(tf2.constant(False, shape=(mem_size), dtype=tf2.bool))
 
   def store_episode(self, e, **kwargs):
+    tf2.debugging.set_log_device_placement(self.__hash["tf_proc_debug"])
     ind = self.mem_cntr % self.mem_size
     ind_arr = tf2.Variable(tf2.constant([[ind, 0], [ind, 1], [ind, 2], [ind, 3],
                                        [ind, 4], [ind, 5], [ind, 6], [ind, 7],
@@ -52,6 +58,7 @@ class EdpisodeDB():
     self.mem_cntr += 1
 
   def get_random_data_batch(self, batch_size):
+    tf2.debugging.set_log_device_placement(self.__hash["tf_proc_debug"])
     total_db_size = min(self.mem_cntr, self.mem_size)
     batch_arr = np.random.choice(total_db_size, batch_size, replace=False)
     states_batch = tf2.Variable(tf2.constant(self.states_mem.numpy()[batch_arr]))

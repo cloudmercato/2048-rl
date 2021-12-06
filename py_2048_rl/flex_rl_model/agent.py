@@ -36,7 +36,8 @@ class Agent():
 
     if "episode_db" not in self.__hash.keys():
       self.__hash["episode_db"] = episodes.EdpisodeDB(self.__hash["mem_size"],\
-                                                      self.__hash["input_dims"])
+                                                      self.__hash["input_dims"],
+                                                      tf_proc_debug=self.__hash["tf_proc_debug"])
 
     self.__hash["last_game_score"] = 0
     self.__hash["logger"] = logger.Logger()
@@ -62,6 +63,7 @@ class Agent():
     ep_db = self.__hash["episode_db"]
     m1 = self.__hash["model"]
     tbcb = self.__hash["tensorboard_callback"]
+    tf2.debugging.set_log_device_placement(self.__hash["tf_proc_debug"])
 
     states, states_, actions, rewards, dones = \
       ep_db.get_random_data_batch(self.__hash['batch_size'])
