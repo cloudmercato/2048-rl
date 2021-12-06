@@ -24,6 +24,10 @@ parser.add_argument('--epsilon_dec', type=float, default=0.001,
                     help='Epsilon - step value')
 parser.add_argument('--log_dir', default="/app/logs",
                     help='Tensorboard log directory')
+parser.add_argument('--model_load_file', default=None,
+                    help='Model load file path (h5)')
+parser.add_argument('--model_save_file', default='model.h5',
+                    help='Model save file path (h5)')
 parser.add_argument('--training_epochs', type=int, default=1,
                     help='Number of epoch rns for every model training run')
 parser.add_argument('--tf_proc_debug', default=False, type=bool,
@@ -38,6 +42,8 @@ nn_mod = nn_model.NN_Model(batch_size = args.batch_size,
                            epsilon_min=args.epsilon_min,
                            epsilon_dec=args.epsilon_dec,
                            taining_epochs=args.training_epochs,
+                           model_load_file=args.model_load_file,
+                           model_save_file=args.model_save_file,
                            log_dir=args.log_dir,
                            tf_proc_debug=args.tf_proc_debug)
 

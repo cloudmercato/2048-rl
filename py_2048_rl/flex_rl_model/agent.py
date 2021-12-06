@@ -18,7 +18,8 @@ class Agent():
     self.__hash["epsilon"] = 1
     self.__hash["epsilon_dec"] = 1e-3
     self.__hash["epsilon_min"] = 0.01
-    self.__hash["fname"] = 'model.h5'
+    self.__hash["model_load_file"] = None
+    self.__hash["model_save_file"] = 'model.h5'
     self.__hash["model_auto_save"] = True
     self.__hash["log_dir"] = "/app/logs"
     self.__hash["tf_proc_debug"] = False
@@ -42,7 +43,9 @@ class Agent():
     self.__hash["logger"] = logger.Logger()
 
     self.__hash["tensorboard_callback"] =\
-      tf2.keras.callbacks.TensorBoard(log_dir=self.__hash["log_dir"], histogram_freq=1)
+      tf2.keras.callbacks.TensorBoard(log_dir=self.__hash["log_dir"],
+                                      histogram_freq=1,
+                                      profile_batch = '500,520')
 
     self.__hash["training_histories"] = []
 
@@ -173,7 +176,7 @@ class Agent():
 
   def save_model(self):
     m1 = self.__hash["model"]
-    m1.save(self.__hash["fname"])
+    m1.save(self.__hash["model_save_file"])
 
   def load_model(self):
-    self.__hash["model"] = tf2.keras.models.load_model(self.__hash["fname"])
+    self.__hash["model"] = tf2.keras.models.load_model(self.__hash["model_load_file"])

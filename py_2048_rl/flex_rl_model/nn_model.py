@@ -29,6 +29,8 @@ class NN_Model(object):
     self.__hash["nn_type"] = "dqn"
     self.__hash["log_dir"] = "/app/logs"
     self.__hash["tf_model"] = None
+    self.__hash["model_load_file"] = None
+    self.__hash["model_save_file"] = None
     self.__hash["agent"] = None
     self.__hash["batch_size"] = 10000
     self.__hash["mem_size"] = 50000
@@ -45,6 +47,7 @@ class NN_Model(object):
 
     if self.get_param("agent") is None:
       self.__hash["agent"] = agent.Agent(model=self.__hash["tf_model"],
+                                         model_load_file=self.__hash["model_load_file"],
                                          batch_size=self.__hash["batch_size"],
                                          lr=self.__hash["lr"],
                                          log_dir=self.__hash["log_dir"],
@@ -58,6 +61,10 @@ class NN_Model(object):
 
 
   def create_tf_model(self):
+    if self.__hash["model_load_file"] is not None:
+      self.__hash["model"] = tf2.keras.models.load_model(self.__hash["model_load_file"])
+      return
+
     layers = tf2.keras.layers
     l_arr = []
     l =None
