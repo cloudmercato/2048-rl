@@ -48,6 +48,8 @@ class Agent():
                                       histogram_freq=1,
                                       profile_batch = '500,520')
 
+    tf2.profiler.experimental.server.start( 6009 )
+
     self.__hash["training_histories"] = []
 
     tf2.debugging.set_log_device_placement(self.__hash["tf_proc_debug"])
