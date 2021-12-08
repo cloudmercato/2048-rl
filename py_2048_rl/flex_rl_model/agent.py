@@ -3,7 +3,7 @@ import numpy as np
 import os
 import py_2048_rl.game.game as game
 import py_2048_rl.logging.logger as logger
-import episodes
+from py_2048_rl.flex_rl_model import episodes
 
 
 class Agent():
@@ -62,7 +62,7 @@ class Agent():
       tf2.keras.layers.Dense(16, activation='relu'),
       tf2.keras.layers.Dense(64, activation='relu'),
       tf2.keras.layers.Dense(self.__hash["n_actions"], activation=None)])
-    model.compile(optimizer=Adam(learning_rate=lr), loss='mean_squared_error')
+    model.compile(optimizer=tf2.keras.optimizers.Adam(learning_rate=0.0001), loss='mean_squared_error')
 
     self.__hash["model"] = model
 

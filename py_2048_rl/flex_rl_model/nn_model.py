@@ -2,8 +2,7 @@
 Neural Network model for RL analysis
 """
 import tensorflow as tf2
-import agent
-
+from py_2048_rl.flex_rl_model import agent
 
 #--- BEGIN NN_Model ---
 class NN_Model(object):
