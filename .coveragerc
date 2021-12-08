@@ -1,0 +1,13 @@
+[run]
+source = py_2048_rl
+
+[report]
+omit = py_2048_rl/tests/*
+
+[report]
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    raise AssertionError
+    raise NotImplementedError
+    if __name__ == .__main__.:
