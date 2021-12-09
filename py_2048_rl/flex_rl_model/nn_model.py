@@ -2,7 +2,6 @@
 Neural Network model for RL analysis
 """
 import tensorflow as tf2
-from py_2048_rl.flex_rl_model import agent
 
 #--- BEGIN NN_Model ---
 class NN_Model(object):
@@ -26,16 +25,12 @@ class NN_Model(object):
     self.__hash["epsilon_dec"] = 1e-3
     self.__hash["epsilon_min"] = 0.01
     self.__hash["nn_type"] = "dqn"
-    self.__hash["log_dir"] = "/app/logs"
     self.__hash["tf_model"] = None
     self.__hash["model_load_file"] = None
     self.__hash["model_save_file"] = None
-    self.__hash["agent"] = None
     self.__hash["batch_size"] = 10000
     self.__hash["mem_size"] = 50000
     self.__hash["training_epochs"] = 1
-    self.__hash["log_dir"] = "/app/logs"
-    self.__hash["tf_proc_debug"] = False
 
     # Copy content in from the argument hash.
     for k in kwargs.keys():
@@ -44,27 +39,11 @@ class NN_Model(object):
     if self.get_param("tf_model") is None:
       self.__hash["tf_model"] = self.create_tf_model()
 
-    if self.get_param("agent") is None:
-      self.__hash["agent"] = agent.Agent(model=self.__hash["tf_model"],
-                                         model_load_file=self.__hash["model_load_file"],
-                                         batch_size=self.__hash["batch_size"],
-                                         lr=self.__hash["lr"],
-                                         log_dir=self.__hash["log_dir"],
-                                         gamma=self.__hash["gamma"],
-                                         epsilon=self.__hash["epsilon"],
-                                         epsilon_dec=self.__hash["epsilon_dec"],
-                                         epsilon_min = self.__hash["epsilon_min"],
-                                         tf_proc_debug=self.__hash["tf_proc_debug"])
-
-    tf2.debugging.set_log_device_placement(self.__hash["tf_proc_debug"])
-
-
   def create_tf_model(self):
     if self.__hash["model_load_file"] is not None:
       self.__hash["model"] = tf2.keras.models.load_model(self.__hash["model_load_file"])
       return
 
-    layers = tf2.keras.layers
     l_arr = []
     l =None
     l_type = None
