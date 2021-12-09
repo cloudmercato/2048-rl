@@ -62,6 +62,7 @@ class Agent():
       tf2.keras.layers.Dense(16, activation='relu'),
       tf2.keras.layers.Dense(64, activation='relu'),
       tf2.keras.layers.Dense(self.__hash["n_actions"], activation=None)])
+
     model.compile(optimizer=tf2.keras.optimizers.Adam(learning_rate=self.__hash["lr"]),
                   loss='mean_squared_error')
 
