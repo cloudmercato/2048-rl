@@ -4,7 +4,12 @@ import os
 import py_2048_rl.game.game as game
 import py_2048_rl.logging.logger as logger
 import py_2048_rl.flex_rl_model.episodes as episodes
+import py_2048_rl.flex_rl_model.callbacks as callbacks
 
+#--- BEGIN FlexSequentialModel ---
+class FlexSequentialModel(tf2.keras.models.Sequential):
+  pass
+#--- END FlexSequentialModel ---
 
 class Agent():
   def __init__(self, **kwargs):
@@ -68,11 +73,11 @@ class Agent():
 
     self.__hash["model"] = model
 
-  def learn(self):
+  def learn(self, run):
     self.accumulate_episode_data()
     ep_db = self.__hash["episode_db"]
     m1 = self.__hash["model"]
-    tbcb = self.__hash["tensorboard_callback"]
+#    tbcb = self.__hash["tensorboard_callback"]
     tf2.debugging.set_log_device_placement(self.__hash["tf_proc_debug"])
 
     states, states_, actions, rewards, dones = \
@@ -84,12 +89,17 @@ class Agent():
     batch_index = np.arange(self.__hash['batch_size'])
     q_target[batch_index, actions] = rewards + self.__hash["gamma"] * \
                                      np.max(q_next.numpy(), axis=(1))
+
     history = m1.fit(tf2.constant(states),
                      q_target,
-                     callbacks=[tbcb],
+                     callbacks=[tf2.keras.callbacks.TensorBoard(self.__hash['log_dir'])],
                      epochs=self.__hash["training_epochs"])
 
-    self.__hash["training_histories"].append(history)
+    # TB log data
+    file_writer = tf2.summary.create_file_writer(self.__hash['log_dir'])
+    file_writer.set_as_default()
+    tf2.summary.scalar('Game score', data=self.__hash['last_game_score'], step=run)
+ #   tf2.summary.scalar('History', data=history, step=run)
 
     # Adjust the epsilon
     self.__hash["epsilon"] = self.__hash["epsilon"]  - self.__hash["epsilon_dec"] \
@@ -104,7 +114,7 @@ class Agent():
     run_num = 0
 
     for i in range(n_games):
-      self.learn()
+      self.learn(i)
       self.play_game(self.action_greedy_epsilon)
       if self.__hash["model_auto_save"]: self.save_model()
 
