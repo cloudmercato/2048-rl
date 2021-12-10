@@ -45,6 +45,7 @@ class Agent():
                                                       tf_proc_debug=self.__hash["tf_proc_debug"])
 
     self.__hash["last_game_score"] = 0
+    self.__hash['last_game_num_moves'] = 0
     self.__hash["logger"] = logger.Logger()
 
     self.__hash["tensorboard_callback"] =\
@@ -99,6 +100,7 @@ class Agent():
     file_writer = tf2.summary.create_file_writer(self.__hash['log_dir'])
     file_writer.set_as_default()
     tf2.summary.scalar('Game score', data=self.__hash['last_game_score'], step=run)
+    tf2.summary.scalar('Game: moves to completion', data=self.__hash['last_game_num_moves'], step=run)
  #   tf2.summary.scalar('History', data=history, step=run)
 
     # Adjust the epsilon
@@ -162,12 +164,15 @@ class Agent():
     reward = None
     score = None
     e_db = self.__hash["episode_db"]
+    num_moves = 0
 
     while not game1.game_over():
       action = action_choice(game1)
       state = np.matrix.flatten( game1.state() )
       reward = game1.do_action(action)
       state_ = np.matrix.flatten( game1.state() )
+      if max(abs(state - state_)) > 0 : num_moves += 1
+
       e_db.store_episode(
         episodes.Episode(state=state,
                          next_state=state_,
@@ -177,6 +182,7 @@ class Agent():
                          done=game1.game_over()))
 
     self.__hash["last_game_score"] = game1.score()
+    self.__hash['last_game_num_moves'] = num_moves
 
   def action_random(self, curr_game):
     return np.random.choice(curr_game.available_actions())
