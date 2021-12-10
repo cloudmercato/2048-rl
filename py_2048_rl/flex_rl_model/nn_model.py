@@ -85,7 +85,8 @@ class NN_Model(object):
     mod = tf2.keras.models.Sequential(l_arr)
     opt = self.__hash["optimizer"]
     loss = self.__hash["loss_function"]
-    mod.compile(optimizer=opt(learning_rate = self.__hash["learning_rate"]),\
+    mod.compile(optimizer=opt(learning_rate = self.__hash["learning_rate"]),
+                metrics=['accuracy'],
                 loss=loss)
     return mod
 

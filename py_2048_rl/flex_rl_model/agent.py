@@ -93,7 +93,6 @@ class Agent():
 
     history = m1.fit(tf2.constant(states),
                      q_target,
-                     callbacks=[tf2.keras.callbacks.TensorBoard(self.__hash['log_dir'])],
                      epochs=self.__hash["training_epochs"])
 
     # TB log data
@@ -101,6 +100,10 @@ class Agent():
     file_writer.set_as_default()
     tf2.summary.scalar('Game score', data=self.__hash['last_game_score'], step=run)
     tf2.summary.scalar('Game: moves to completion', data=self.__hash['last_game_num_moves'], step=run)
+
+    for name in history.history.keys():
+      tf2.summary.scalar(name, data=history.history[name][-1], step=run)
+
  #   tf2.summary.scalar('History', data=history, step=run)
 
     # Adjust the epsilon
