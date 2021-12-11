@@ -35,6 +35,7 @@ class EdpisodeDB():
     self.new_states_mem = tf2.Variable(tf2.constant(0., shape=states_dims, dtype=tf2.float32))
     self.action_mem = tf2.Variable(tf2.constant(0, shape=(mem_size), dtype=tf2.int32))
     self.reward_mem = tf2.Variable(tf2.constant(0, shape=(mem_size), dtype=tf2.int32))
+    self.score_mem = tf2.Variable(tf2.constant(0, shape=(mem_size), dtype=tf2.int32))
     self.done_mem = tf2.Variable(tf2.constant(False, shape=(mem_size), dtype=tf2.bool))
 
   def store_episode(self, e, **kwargs):
@@ -49,6 +50,7 @@ class EdpisodeDB():
     self.new_states_mem.scatter_nd_update(ind_arr, tf2.constant(e.next_state, dtype=tf2.float32))
     self.action_mem.scatter_nd_update([ind], [e.action] )
     self.reward_mem.scatter_nd_update([ind], [e.reward] )
+    self.score_mem.scatter_nd_update([ind], [e.score])
 
     # Special processing for boolean in done_mem
     done_mem_np = self.done_mem.numpy()
@@ -65,5 +67,6 @@ class EdpisodeDB():
     new_states_batch = tf2.Variable(tf2.constant(self.new_states_mem.numpy()[batch_arr]))
     action_batch = tf2.Variable( tf2.constant(self.action_mem.numpy()[batch_arr]) )
     reward_batch = tf2.Variable(tf2.constant(self.reward_mem.numpy()[batch_arr]))
+    score_batch = tf2.Variable(tf2.constant(self.score_mem.numpy()[batch_arr]))
     done_batch = tf2.Variable( tf2.constant(self.done_mem.numpy()[batch_arr]) )
-    return states_batch, new_states_batch, action_batch, reward_batch, done_batch
+    return states_batch, new_states_batch, action_batch, reward_batch, score_batch, done_batch

@@ -19,6 +19,7 @@ class Agent():
     self.__hash["input_dims"] = [16]
     self.__hash["lr"] = 0.001
     self.__hash["gamma"] = 0.99
+    self.__hash["gamma1"] = 0.99
     self.__hash["n_actions"] = 4
     self.__hash["epsilon"] = 1
     self.__hash["epsilon_dec"] = 1e-3
@@ -81,7 +82,7 @@ class Agent():
 #    tbcb = self.__hash["tensorboard_callback"]
     tf2.debugging.set_log_device_placement(self.__hash["tf_proc_debug"])
 
-    states, states_, actions, rewards, dones = \
+    states, states_, actions, rewards, scores, dones = \
       ep_db.get_random_data_batch(self.__hash['batch_size'])
 
     q_eval = tf2.Variable(tf2.constant(m1.predict(states.numpy())))
@@ -89,7 +90,9 @@ class Agent():
     q_target = q_eval.numpy()
     batch_index = np.arange(self.__hash['batch_size'])
     q_target[batch_index, actions] = rewards + self.__hash["gamma"] * \
-                                     np.max(q_next.numpy(), axis=(1))
+                                     np.max(q_next.numpy(), axis=(1)) + \
+                                     self.__hash["gamma1"] * scores.numpy()
+
 
     history = m1.fit(tf2.constant(states),
                      q_target,
@@ -104,7 +107,8 @@ class Agent():
     for name in history.history.keys():
       tf2.summary.scalar(name, data=history.history[name][-1], step=run)
 
- #   tf2.summary.scalar('History', data=history, step=run)
+    # Close the writer
+    file_writer.close()
 
     # Adjust the epsilon
     self.__hash["epsilon"] = self.__hash["epsilon"]  - self.__hash["epsilon_dec"] \
