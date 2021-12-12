@@ -4,7 +4,6 @@ import logging
 
 import tensorflow as tf
 
-import nn_model
 from py_2048_rl.flex_rl_model.agent import Agent
 
 
@@ -25,6 +24,8 @@ parser.add_argument('--lr', type=float, default=0.0001,
                     help='Learning rate')
 parser.add_argument('--gamma', type=float, default=0.99,
                     help='Gamma')
+parser.add_argument('--gamma1', type=float, default=0.99,
+                    help='Gamma1')
 parser.add_argument('--epsilon', type=float, default=1.0,
                     help='Epsilon')
 parser.add_argument('--epsilon-min', type=float, default=0.01,
@@ -81,6 +82,7 @@ agent = Agent(
     input_dims=[16],
     lr=args.lr,
     gamma=args.gamma,
+    gamma1=args.gamma1,
     epsilon=args.epsilon,
     epsilon_dec=args.epsilon_dec,
     epsilon_min=args.epsilon_min,

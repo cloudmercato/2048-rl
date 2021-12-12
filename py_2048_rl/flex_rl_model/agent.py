@@ -17,6 +17,7 @@ class Agent:
             input_dims=[16],
             lr=0.001,
             gamma=0.99,
+            gamma1=0.99,
             epsilon=1,
             epsilon_dec=1e-3,
             epsilon_min=0.01,
@@ -34,6 +35,7 @@ class Agent:
         self.input_dims = input_dims[::]
         self.lr = lr
         self.gamma = gamma
+        self.gamma1 = gamma1
         self.n_actions = 4
         self.epsilon = epsilon
         self.epsilon_dec = epsilon_dec
@@ -62,11 +64,12 @@ class Agent:
             )
 
         self.last_game_score = 0
+        self.last_move_count = 0
 
         self.tensorboard_callback = tf.keras.callbacks.TensorBoard(
             log_dir=self.log_dir,
             histogram_freq=1,
-            profile_batch = '500,520'
+            profile_batch='500,520'
         )
 
         self.training_histories = []
@@ -84,26 +87,34 @@ class Agent:
 
         self.model = model
 
-    def learn(self):
+    def learn(self, run):
         self.accumulate_episode_data()
         ep_db = self.episode_db
         m1 = self.model
 
-        states, states_, actions, rewards, dones = \
+        states, states_, actions, rewards, scores, dones = \
             ep_db.get_random_data_batch(self.batch_size)
 
         q_eval = tf.Variable(tf.constant(m1.predict(states.numpy())))
         q_next = tf.Variable(tf.constant(m1.predict(states_.numpy())))
         q_target = q_eval.numpy()
+
         batch_index = np.arange(self.batch_size)
         q_target[batch_index, actions] = rewards + self.gamma * \
-             np.max(q_next.numpy(), axis=(1))
+             np.max(q_next.numpy(), axis=(1)) + \
+             self.gamma1 * scores.numpy()
         history = m1.fit(
             tf.constant(states),
             q_target,
             callbacks=[self.tensorboard_callback],
             epochs=self.training_epochs
         )
+        # Log
+        tf.summary.scalar('Game score', data=self.last_game_score, step=run)
+        tf.summary.scalar('Game: moves to compleuion', data=self.last_move_count, step=run)
+
+        for name in history.history:
+            tf.summary.scalar(name, data=history.history[name][-1], step=run)
 
         self.training_histories.append(history)
 
@@ -119,7 +130,7 @@ class Agent:
         run_num = 0
 
         for i in range(n_games):
-            self.learn()
+            self.learn(i)
             self.play_game(self.action_greedy_epsilon)
 
             if self.model_auto_save:
@@ -175,6 +186,7 @@ class Agent:
             e_db.store_episode(episode)
 
         self.last_game_score = game1.score()
+        self.last_move_count = game1.move_count
 
     def action_random(self, curr_game):
         return np.random.choice(curr_game.available_actions())

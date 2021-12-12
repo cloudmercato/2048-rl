@@ -39,10 +39,10 @@ class EdpisodeDB:
         self.new_states_mem = tf.Variable(tf.constant(0., shape=states_dims, dtype=tf.float32))
         self.action_mem = tf.Variable(tf.constant(0, shape=(mem_size), dtype=tf.int32))
         self.reward_mem = tf.Variable(tf.constant(0, shape=(mem_size), dtype=tf.int32))
+        self.score_mem = tf.Variable(tf.constant(0, shape=(mem_size), dtype=tf.int32))
         self.done_mem = tf.Variable(tf.constant(False, shape=(mem_size), dtype=tf.bool))
 
     def store_episode(self, e, **kwargs):
-        tf.debugging.set_log_device_placement(self.__hash["tf_proc_debug"])
         ind = self.mem_cntr % self.mem_size
         ind_arr = tf.Variable(tf.constant([
             [ind, 0], [ind, 1], [ind, 2], [ind, 3],
@@ -55,6 +55,7 @@ class EdpisodeDB:
         self.new_states_mem.scatter_nd_update(ind_arr, tf.constant(e.next_state, dtype=tf.float32))
         self.action_mem.scatter_nd_update([ind], [e.action])
         self.reward_mem.scatter_nd_update([ind], [e.reward])
+        self.score_mem.scatter_nd_update([ind], [e.score])
 
         # Special processing for boolean in done_mem
         done_mem_np = self.done_mem.numpy()
@@ -64,12 +65,12 @@ class EdpisodeDB:
         self.mem_cntr += 1
 
     def get_random_data_batch(self, batch_size):
-        tf.debugging.set_log_device_placement(self.__hash["tf_proc_debug"])
         total_db_size = min(self.mem_cntr, self.mem_size)
         batch_arr = np.random.choice(total_db_size, batch_size, replace=False)
         states_batch = tf.Variable(tf.constant(self.states_mem.numpy()[batch_arr]))
         new_states_batch = tf.Variable(tf.constant(self.new_states_mem.numpy()[batch_arr]))
         action_batch = tf.Variable(tf.constant(self.action_mem.numpy()[batch_arr]))
         reward_batch = tf.Variable(tf.constant(self.reward_mem.numpy()[batch_arr]))
+        score_batch = tf.Variable(tf.constant(self.score_mem.numpy()[batch_arr]))
         done_batch = tf.Variable(tf.constant(self.done_mem.numpy()[batch_arr]))
-        return states_batch, new_states_batch, action_batch, reward_batch, done_batch
+        return states_batch, new_states_batch, action_batch, reward_batch, score_batch, done_batch

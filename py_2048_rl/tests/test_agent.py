@@ -13,7 +13,7 @@ class AgentTest(TestCase):
         self.agent = agent.Agent()
 
     def test_learn(self):
-        self.agent.learn()
+        self.agent.learn(0)
 
     def test_learn_on_repeat(self):
         self.agent.learn_on_repeat()
