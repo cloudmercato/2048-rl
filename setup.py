@@ -27,7 +27,7 @@ setup(
         'Programming Language :: Python :: 3.6',
     ],
     long_description=read_file('README.md'),
-    # entry_points={'console_scripts': [
-    #     'cb-client = py_2048_rl.console:main',
-    # ]},
+    entry_points={'console_scripts': [
+        '2048-rl = py_2048_rl.console:main',
+    ]},
 )

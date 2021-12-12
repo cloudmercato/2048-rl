@@ -66,20 +66,21 @@ class Agent:
 
     def learn(self, run):
         self.accumulate_episode_data()
-        ep_db = self.episode_db
-        m1 = self.model
 
         states, states_, actions, rewards, scores, dones = \
-            ep_db.get_random_data_batch(self.batch_size)
+            self.episode_db.get_random_data_batch(self.batch_size)
 
-        q_eval = tf.Variable(tf.constant(m1.predict(states.numpy())))
-        q_next = tf.Variable(tf.constant(m1.predict(states_.numpy())))
+        q_eval = tf.Variable(self.model.predict(states.numpy()))
+        q_next = tf.Variable(self.model.predict(states_.numpy()))
         q_target = q_eval.numpy()
 
         batch_index = np.arange(self.batch_size)
-        q_target[batch_index, actions] = rewards + self.gamma * \
-             np.max(q_next.numpy(), axis=(1)) + \
-             self.gamma1 * scores.numpy()
+        q_target[batch_index, actions] = tf.math.l2_normalize(
+            rewards +
+            self.gamma * np.max(q_next, axis=1) +
+            self.gamma1 * scores.numpy()
+            + dones.numpy()
+        )
 
         callbacks = []
         if self.log_dir:
@@ -90,8 +91,8 @@ class Agent:
             )
             callbacks.append(tb_callback)
 
-        history = m1.fit(
-            tf.constant(states),
+        history = self.model.fit(
+            states.numpy(),
             q_target,
             callbacks=callbacks,
             epochs=self.training_epochs
