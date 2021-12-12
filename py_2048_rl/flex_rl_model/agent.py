@@ -14,6 +14,7 @@ class Agent:
             self,
             batch_size=10000,
             mem_size=50000,
+            report_sample_size=50,
             input_dims=[16],
             lr=0.001,
             gamma=0.99,
@@ -33,6 +34,8 @@ class Agent:
         self.__hash = {}
         self.batch_size = batch_size
         self.mem_size = mem_size
+        self.report_sample_size=report_sample_size
+        self.score_sample_arr = [0 for i in range(self.report_sample_size)]
         self.input_dims = input_dims[::]
         self.lr = lr
         self.gamma = gamma
@@ -139,6 +142,24 @@ class Agent:
         file_writer.set_as_default()
         tf.summary.scalar('Game score', data=self.last_game_score, step=run)
         tf.summary.scalar('Game: moves to completion', data=self.last_game_num_moves, step=run)
+
+        self.score_sample_arr.append( self.last_game_score )
+        if run > self.report_sample_size: self.score_sample_arr.pop(0)
+
+        tf.summary.scalar('Sample minimum: last ' + self.report_sample_size.__str__(),
+                          data=min(self.score_sample_arr),
+                          step=run
+                          )
+
+        tf.summary.scalar('Sample average: last ' + self.report_sample_size.__str__(),
+                          data=sum(self.score_sample_arr)/len(self.score_sample_arr),
+                          step=run
+                          )
+
+        tf.summary.scalar('Sample maximum: last ' + self.report_sample_size.__str__(),
+                          data=max(self.score_sample_arr),
+                          step=run
+                          )
 
         for name in history.history.keys():
             tf.summary.scalar(name, data=history.history[name][-1], step=run)
