@@ -15,22 +15,9 @@ class Episode:
         self.score = score
         self.done = done
 
-        self.__hash = {}
-        self.__hash["tf_proc_debug"] = False
-        for k in kwargs.keys():
-            self.__hash[k] = kwargs[k]
-
-        tf.debugging.set_log_device_placement(self.__hash["tf_proc_debug"])
-
 
 class EdpisodeDB:
     def __init__(self, mem_size, input_dims, **kwargs):
-        self.__hash = {}
-        self.__hash["tf_proc_debug"] = False
-
-        for k in kwargs.keys():
-            self.__hash[k] = kwargs[k]
-
         self.mem_size = mem_size
         self.mem_cntr = 0
         states_dims = [mem_size]

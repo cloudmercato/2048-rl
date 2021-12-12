@@ -3,8 +3,9 @@ import logging
 import tensorflow as tf
 import numpy as np
 
-import py_2048_rl.game.game as game
-from py_2048_rl.flex_rl_model import episodes
+from py_2048_game import Game
+from py_2048_rl import episodes
+from py_2048_rl import models
 
 logger = logging.getLogger('py2048')
 
@@ -25,7 +26,6 @@ class Agent:
             model_save_file='model.h5',
             model_auto_save=True,
             log_dir="/tmp/logs",
-            tf_proc_debug=False,
             training_epochs=1,
             **kwargs
         ):
@@ -36,33 +36,33 @@ class Agent:
         self.lr = lr
         self.gamma = gamma
         self.gamma1 = gamma1
-        self.n_actions = 4
         self.epsilon = epsilon
         self.epsilon_dec = epsilon_dec
         self.epsilon_min = epsilon_min
-        self.model_load_file = model_load_file or model_save_file
+        self.model_load_file = model_load_file
         self.model_save_file = model_save_file
         self.model_auto_save = model_auto_save
         self.log_dir = log_dir
-        self.tf_proc_debug = tf_proc_debug
         self.training_epochs = training_epochs
 
         for k, v in kwargs.items():
             self.__hash[k] = kwargs[k]
 
-        """
-        Special parameters.
-        """
-        if "model" not in self.__hash.keys():
-            self.__create_default_model()
 
         if "episode_db" not in self.__hash.keys():
             self.episode_db = episodes.EdpisodeDB(
                 self.mem_size,
                 self.input_dims,
-                tf_proc_debug=self.tf_proc_debug
             )
 
+        if self.model_load_file:
+            self.model = self.load_model()
+        else:
+            self.model = models.DEFAULT_MODEL
+            self.model.compile(
+                optimizer=tf.keras.optimizers.Adam(learning_rate=self.lr),
+                loss='mean_squared_error'
+            )
         self.last_game_score = 0
         self.last_move_count = 0
 
@@ -73,19 +73,6 @@ class Agent:
         )
 
         self.training_histories = []
-
-    def __create_default_model(self):
-        model: tf.keras.models.Sequential = tf.keras.Sequential([
-            tf.keras.layers.Dense(16, activation='relu'),
-            tf.keras.layers.Dense(64, activation='relu'),
-            tf.keras.layers.Dense(self.n_actions, activation=None)
-        ])
-        model.compile(
-            optimizer=tf.keras.optimizers.Adam(learning_rate=0.0001),
-            loss='mean_squared_error'
-        )
-
-        self.model = model
 
     def learn(self, run):
         self.accumulate_episode_data()
@@ -111,7 +98,7 @@ class Agent:
         )
         # Log
         tf.summary.scalar('Game score', data=self.last_game_score, step=run)
-        tf.summary.scalar('Game: moves to compleuion', data=self.last_move_count, step=run)
+        tf.summary.scalar('Game move', data=self.last_move_count, step=run)
 
         for name in history.history:
             tf.summary.scalar(name, data=history.history[name][-1], step=run)
@@ -161,32 +148,26 @@ class Agent:
         logger.debug("Initial data accumulation completed.")
 
     def play_game(self, action_choice):
-        game1 = game.Game()
-        state = None
-        action = None
-        state = None
-        state_ = None
-        reward = None
-        score = None
+        game = Game()
         e_db = self.episode_db
 
-        while not game1.game_over():
-            action = action_choice(game1)
-            state = np.matrix.flatten(game1.state())
-            reward = game1.do_action(action)
-            state_ = np.matrix.flatten(game1.state())
+        while not game.game_over():
+            action = action_choice(game)
+            state = np.matrix.flatten(game.state())
+            reward = game.do_action(action)
+            state_ = np.matrix.flatten(game.state())
             episode = episodes.Episode(
                 state=state,
                 next_state=state_,
                 action=action,
                 reward=reward,
-                score=game1.score(),
-                done=game1.game_over()
+                score=game.score,
+                done=game.game_over()
             )
             e_db.store_episode(episode)
 
-        self.last_game_score = game1.score()
-        self.last_move_count = game1.move_count
+        self.last_game_score = game.score
+        self.last_move_count = game.move_count
 
     def action_random(self, curr_game):
         return np.random.choice(curr_game.available_actions())
@@ -207,4 +188,4 @@ class Agent:
         m1.save(self.model_save_file)
 
     def load_model(self):
-        self.model = tf.keras.models.load_model(self.model_load_file)
+        return tf.keras.models.load_model(self.model_load_file)

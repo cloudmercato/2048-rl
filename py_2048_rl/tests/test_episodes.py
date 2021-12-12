@@ -2,7 +2,7 @@ from unittest import TestCase
 import numpy as np
 
 from py_2048_rl.game.game import Game
-from py_2048_rl.flex_rl_model import episodes
+from py_2048_rl import episodes
 
 
 class EpisodeTest(TestCase):

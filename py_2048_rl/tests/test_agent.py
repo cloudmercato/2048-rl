@@ -1,5 +1,5 @@
 from unittest import TestCase
-from py_2048_rl.flex_rl_model import agent
+from py_2048_rl import agent
 from py_2048_rl.game.game import Game
 
 

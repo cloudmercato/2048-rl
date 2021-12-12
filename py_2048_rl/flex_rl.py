@@ -4,12 +4,13 @@ import logging
 
 import tensorflow as tf
 
-from py_2048_rl.flex_rl_model.agent import Agent
+from py_2048_rl.agent import Agent
 
 
 # Making sure we are running the main routine.
 if __name__ != "__main__":
-  exit()
+    exit()
+
 
 logger = logging.getLogger('py2048')
 tf_logger = logging.getLogger('tensorflow')
