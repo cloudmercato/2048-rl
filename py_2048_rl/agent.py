@@ -10,6 +10,10 @@ from py_2048_rl import models
 logger = logging.getLogger('py2048')
 
 
+def random_action_callback(game):
+    return np.random.choice(game.available_actions())
+
+
 class Agent:
     def __init__(
             self,
@@ -25,11 +29,10 @@ class Agent:
             model_load_file=None,
             model_save_file='model.h5',
             model_auto_save=True,
-            log_dir="/tmp/logs",
+            log_dir="/tmp/",
             training_epochs=1,
             **kwargs
         ):
-        self.__hash = {}
         self.batch_size = batch_size
         self.mem_size = mem_size
         self.input_dims = input_dims[::]
@@ -45,15 +48,10 @@ class Agent:
         self.log_dir = log_dir
         self.training_epochs = training_epochs
 
-        for k, v in kwargs.items():
-            self.__hash[k] = kwargs[k]
-
-
-        if "episode_db" not in self.__hash.keys():
-            self.episode_db = episodes.EdpisodeDB(
-                self.mem_size,
-                self.input_dims,
-            )
+        self.episode_db = episodes.EdpisodeDB(
+            self.mem_size,
+            self.input_dims,
+        )
 
         if self.model_load_file:
             self.model = self.load_model()
@@ -65,14 +63,6 @@ class Agent:
             )
         self.last_game_score = 0
         self.last_move_count = 0
-
-        self.tensorboard_callback = tf.keras.callbacks.TensorBoard(
-            log_dir=self.log_dir,
-            histogram_freq=1,
-            profile_batch='500,520'
-        )
-
-        self.training_histories = []
 
     def learn(self, run):
         self.accumulate_episode_data()
@@ -90,10 +80,20 @@ class Agent:
         q_target[batch_index, actions] = rewards + self.gamma * \
              np.max(q_next.numpy(), axis=(1)) + \
              self.gamma1 * scores.numpy()
+
+        callbacks = []
+        if self.log_dir:
+            tb_callback = tf.keras.callbacks.TensorBoard(
+                log_dir=self.log_dir,
+                histogram_freq=1,
+                profile_batch='500,520'
+            )
+            callbacks.append(tb_callback)
+
         history = m1.fit(
             tf.constant(states),
             q_target,
-            callbacks=[self.tensorboard_callback],
+            callbacks=callbacks,
             epochs=self.training_epochs
         )
         # Log
@@ -103,18 +103,15 @@ class Agent:
         for name in history.history:
             tf.summary.scalar(name, data=history.history[name][-1], step=run)
 
-        self.training_histories.append(history)
-
         # Adjust the epsilon
         if self.epsilon > self.epsilon_min:
             self.epsilon = self.epsilon - self.epsilon_dec
+        tf.summary.scalar('Epsilon', data=self.epsilon, step=run)
 
     def learn_on_repeat(self, n_games=1):
         min_score = 0
         max_score = 0
-        avg_score = 0.0
         sum_scores = 0
-        run_num = 0
 
         for i in range(n_games):
             self.learn(i)
@@ -123,36 +120,31 @@ class Agent:
             if self.model_auto_save:
                 self.save_model()
 
-            if i == 0:
-                min_score = self.last_game_score
-            else:
+            if i != 0:
                 min_score = min(min_score, self.last_game_score)
             max_score = max(max_score, self.last_game_score)
             sum_scores += self.last_game_score
-            run_num += 1
-            avg_score = sum_scores / run_num
+            avg_score = sum_scores / (i+1)
 
-            logger.info('Step %d: Run=%s min=%s avg=%s last=%s max=%s',
-                        i, run_num, max_score, avg_score, self.last_game_score, max_score)
+            logger.info('Step %d: min=%s avg=%s last=%s max=%s',
+                        i, max_score, avg_score, self.last_game_score, max_score)
 
     def accumulate_episode_data(self):
-        ep_db = self.episode_db
         # Bail if there's nothing to do.
-        if ep_db.mem_cntr >= self.batch_size:
+        if self.episode_db.mem_cntr >= self.batch_size:
             return
 
         logger.debug("Initial data accumulation. Collection size = %s episodes.",
                      self.mem_size)
-        while ep_db.mem_cntr < self.batch_size:
-            self.play_game(self.action_random)
+        while self.episode_db.mem_cntr < self.batch_size:
+            self.play_game(random_action_callback)
         logger.debug("Initial data accumulation completed.")
 
-    def play_game(self, action_choice):
+    def play_game(self, action_callback):
         game = Game()
-        e_db = self.episode_db
 
         while not game.game_over():
-            action = action_choice(game)
+            action = action_callback(game)
             state = np.matrix.flatten(game.state())
             reward = game.do_action(action)
             state_ = np.matrix.flatten(game.state())
@@ -164,28 +156,24 @@ class Agent:
                 score=game.score,
                 done=game.game_over()
             )
-            e_db.store_episode(episode)
+            self.episode_db.store_episode(episode)
 
         self.last_game_score = game.score
         self.last_move_count = game.move_count
 
-    def action_random(self, curr_game):
-        return np.random.choice(curr_game.available_actions())
-
-    def action_greedy_epsilon(self, curr_game):
+    def action_greedy_epsilon(self, game):
         if np.random.random() < self.epsilon:
-            return self.action_random(curr_game)
+            return random_action_callback(game)
 
-        state = curr_game.state()
+        state = game.state()
         state = np.matrix.reshape(state, (1, 16))
-        m1 = self.model
-        actions = m1.predict(state)
-        actions = actions[0][curr_game.available_actions()]
+
+        actions = self.model.predict(state)
+        actions = actions[0][game.available_actions()]
         return np.argmax(actions)
 
     def save_model(self):
-        m1 = self.model
-        m1.save(self.model_save_file)
+        self.model.save(self.model_save_file)
 
     def load_model(self):
         return tf.keras.models.load_model(self.model_load_file)

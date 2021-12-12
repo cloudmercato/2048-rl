@@ -91,7 +91,6 @@ agent = Agent(
     model_save_file=args.model_save_file,
     model_auto_save=args.model_auto_save,
     log_dir=args.log_dir,
-    tf_proc_debug=args.tf_log_device,
     training_epochs=args.training_epochs,
 )
 
