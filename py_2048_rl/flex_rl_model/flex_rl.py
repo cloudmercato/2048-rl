@@ -18,12 +18,16 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--learn-runs', type=int, default=100, help='Number of model learn runs')
 parser.add_argument('--batch-size', type=int, default=10000,
                     help='Training batch selection size (in number of episodes')
-parser.add_argument('--mem_size', type=int, default=50000,
+parser.add_argument('--mem-size', type=int, default=50000,
                     help='Learning episode DB size (in number of episodes')
 parser.add_argument('--lr', type=float, default=0.0001,
                     help='Learning rate')
 parser.add_argument('--gamma', type=float, default=0.99,
                     help='Gamma')
+parser.add_argument('--gamma1', type=float, default=0.99,
+                    help='Gamma1')
+parser.add_argument('--gamma2', type=float, default=0.99,
+                    help='Gamma2')
 parser.add_argument('--epsilon', type=float, default=1.0,
                     help='Epsilon')
 parser.add_argument('--epsilon-min', type=float, default=0.01,

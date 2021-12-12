@@ -39,6 +39,7 @@ class EdpisodeDB:
         self.new_states_mem = tf.Variable(tf.constant(0., shape=states_dims, dtype=tf.float32))
         self.action_mem = tf.Variable(tf.constant(0, shape=(mem_size), dtype=tf.int32))
         self.reward_mem = tf.Variable(tf.constant(0, shape=(mem_size), dtype=tf.int32))
+        self.score_mem = tf.Variable(tf.constant(0, shape=(mem_size), dtype=tf.int32))
         self.done_mem = tf.Variable(tf.constant(False, shape=(mem_size), dtype=tf.bool))
 
     def store_episode(self, e, **kwargs):
@@ -71,5 +72,6 @@ class EdpisodeDB:
         new_states_batch = tf.Variable(tf.constant(self.new_states_mem.numpy()[batch_arr]))
         action_batch = tf.Variable(tf.constant(self.action_mem.numpy()[batch_arr]))
         reward_batch = tf.Variable(tf.constant(self.reward_mem.numpy()[batch_arr]))
+        score_batch = tf.Variable(tf.constant(self.score_mem.numpy()[batch_arr]))
         done_batch = tf.Variable(tf.constant(self.done_mem.numpy()[batch_arr]))
-        return states_batch, new_states_batch, action_batch, reward_batch, done_batch
+        return states_batch, new_states_batch, action_batch, reward_batch, score_batch, done_batch

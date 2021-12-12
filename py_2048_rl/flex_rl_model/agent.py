@@ -17,6 +17,8 @@ class Agent:
             input_dims=[16],
             lr=0.001,
             gamma=0.99,
+            gamma1=0.99,
+            gamma2=0.99,
             epsilon=1,
             epsilon_dec=1e-3,
             epsilon_min=0.01,
@@ -34,6 +36,8 @@ class Agent:
         self.input_dims = input_dims[::]
         self.lr = lr
         self.gamma = gamma
+        self.gamma1 = gamma1
+        self.gamma2 = gamma2
         self.n_actions = 4
         self.epsilon = epsilon
         self.epsilon_dec = epsilon_dec
@@ -91,23 +95,30 @@ class Agent:
 
         self.model = model
 
-    def learn(self):
+    def learn(self, run=0):
         self.accumulate_episode_data()
         ep_db = self.episode_db
         m1 = self.model
 
-        states, states_, actions, rewards, dones = \
+        states, states_, actions, rewards, scores, dones = \
             ep_db.get_random_data_batch(self.batch_size)
 
         q_eval = tf.Variable(tf.constant(m1.predict(states.numpy())))
         q_next = tf.Variable(tf.constant(m1.predict(states_.numpy())))
         q_target = q_eval.numpy()
         batch_index = np.arange(self.batch_size)
-        q_target[batch_index, actions] = rewards + self.gamma * \
-             np.max(q_next.numpy(), axis=(1))
 
-        logger.debug("learn: states: %s", states.shape)
-        logger.debug("learn: q_target: %s", q_target.shape)
+        q_target[batch_index, actions] = tf.math.l2_normalize(
+            tf.cast(
+                tf.constant(
+                    rewards +
+                    self.gamma * np.max(q_next.numpy(), axis=(1)) +
+                    self.gamma1 * scores.numpy() +
+                    self.gamma2 * scores.numpy() * dones.numpy(),
+                ),
+                tf.float32
+            )
+        )
 
         history = m1.fit(
             states.numpy(),
@@ -122,6 +133,18 @@ class Agent:
         if self.epsilon > self.epsilon_min:
             self.epsilon = self.epsilon - self.epsilon_dec
 
+        # Tensorboard reporting
+        file_writer = tf.summary.create_file_writer(self.log_dir)
+        file_writer.set_as_default()
+        tf.summary.scalar('Game score', data=self.last_game_score, step=run)
+        tf.summary.scalar('Game: moves to completion', data=self.last_game_num_moves, step=run)
+
+        for name in history.history.keys():
+            tf.summary.scalar(name, data=history.history[name][-1], step=run)
+
+        # Close the writer
+        file_writer.close()
+
     def learn_on_repeat(self, n_games=1):
         min_score = 0
         max_score = 0
@@ -130,7 +153,7 @@ class Agent:
         run_num = 0
 
         for i in range(n_games):
-            self.learn()
+            self.learn(i)
             self.play_game(self.action_greedy_epsilon)
 
             if self.model_auto_save:
@@ -140,13 +163,14 @@ class Agent:
                 min_score = self.last_game_score
             else:
                 min_score = min(min_score, self.last_game_score)
+
             max_score = max(max_score, self.last_game_score)
             sum_scores += self.last_game_score
             run_num += 1
             avg_score = sum_scores / run_num
 
             logger.info('Step %d: Run=%s min=%s avg=%s last=%s max=%s',
-                        i, run_num, max_score, avg_score, self.last_game_score, max_score)
+                        i, run_num, min_score, avg_score, self.last_game_score, max_score)
 
     def accumulate_episode_data(self):
         ep_db = self.episode_db
@@ -169,12 +193,15 @@ class Agent:
         reward = None
         score = None
         e_db = self.episode_db
+        self.last_game_num_moves = 0
 
         while not game1.game_over():
             action = action_choice(game1)
             state = np.matrix.flatten(game1.state())
             reward = game1.do_action(action)
             state_ = np.matrix.flatten(game1.state())
+            self.last_game_num_moves += 1
+
             episode = episodes.Episode(
                 state=state,
                 next_state=state_,
