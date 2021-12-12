@@ -3,7 +3,7 @@ import logging
 import tensorflow as tf
 import numpy as np
 
-from py_2048_game import Game
+from py_2048_rl.game.game import Game
 from py_2048_rl import episodes
 from py_2048_rl import models
 
@@ -154,12 +154,12 @@ class Agent:
                 next_state=state_,
                 action=action,
                 reward=reward,
-                score=game.score,
+                score=game.score(),
                 done=game.game_over()
             )
             self.episode_db.store_episode(episode)
 
-        self.last_game_score = game.score
+        self.last_game_score = game.score()
         self.last_move_count = game.move_count
 
     def action_greedy_epsilon(self, game):
