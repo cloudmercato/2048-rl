@@ -7,11 +7,6 @@ import tensorflow as tf
 from py_2048_rl.agent import Agent
 
 
-# Making sure we are running the main routine.
-if __name__ != "__main__":
-    exit()
-
-
 logger = logging.getLogger('py2048')
 tf_logger = logging.getLogger('tensorflow')
 
@@ -46,52 +41,57 @@ parser.add_argument('--model-disable-autosave', default=True, action="store_fals
 parser.add_argument('--log-dir', default=None,
                     help='Tensorboard log directory')
 parser.add_argument('--tf-log-device', default=False, action="store_true",
-                    help='Determines whether TF compute device info is displayed. Default = False')
+                    help='Determines whether TF compute device info is displayed.')
 parser.add_argument('--tf-dump-debug-info', default=False, action="store_true")
 parser.add_argument('--tf-profiler-port', default=0, type=int)
 parser.add_argument('--verbose', '-v', default=3, type=int)
 parser.add_argument('--tf-verbose', '-tfv', default=2, type=int)
 
-args = parser.parse_args()
 
-log_verbose = 60 - (args.verbose*10)
-log_handler = logging.StreamHandler()
-log_handler.setLevel(log_verbose)
-logger.addHandler(log_handler)
-logger.setLevel(log_verbose)
+def main():
+    args = parser.parse_args()
 
-tf_log_verbose = 60 - (args.tf_verbose*10)
-tf_logger.setLevel(tf_log_verbose)
-os.environ.setdefault('TF_CPP_MIN_LOG_LEVEL', str(args.tf_verbose))
+    log_verbose = 60 - (args.verbose*10)
+    log_handler = logging.StreamHandler()
+    log_handler.setLevel(log_verbose)
+    logger.addHandler(log_handler)
+    logger.setLevel(log_verbose)
 
-logger.debug('Config: %s', vars(args))
+    tf_log_verbose = 60 - (args.tf_verbose*10)
+    tf_logger.setLevel(tf_log_verbose)
+    os.environ.setdefault('TF_CPP_MIN_LOG_LEVEL', str(args.tf_verbose))
 
-tf.debugging.set_log_device_placement(args.tf_log_device)
-if args.log_dir and args.tf_dump_debug_info:
-    tf.debugging.experimental.enable_dump_debug_info(
-        args.log_dir,
-        tensor_debug_mode="FULL_HEALTH",
-        circular_buffer_size=-1
+    logger.debug('Config: %s', vars(args))
+
+    tf.debugging.set_log_device_placement(args.tf_log_device)
+    if args.log_dir and args.tf_dump_debug_info:
+        tf.debugging.experimental.enable_dump_debug_info(
+            args.log_dir,
+            tensor_debug_mode="FULL_HEALTH",
+            circular_buffer_size=-1
+        )
+    if args.tf_profiler_port:
+        tf.profiler.experimental.server.start(args.tf_profiler_port)
+
+    agent = Agent(
+        batch_size=args.batch_size,
+        mem_size=args.mem_size,
+        # input_dims=args.input_dims,
+        input_dims=[16],
+        lr=args.lr,
+        gamma=args.gamma,
+        gamma1=args.gamma1,
+        epsilon=args.epsilon,
+        epsilon_dec=args.epsilon_dec,
+        epsilon_min=args.epsilon_min,
+        model_load_file=args.model_load_file,
+        model_save_file=args.model_save_file,
+        model_auto_save=args.model_auto_save,
+        log_dir=args.log_dir,
+        training_epochs=args.training_epochs,
     )
-if args.tf_profiler_port:
-    tf.profiler.experimental.server.start(args.tf_profiler_port)
 
-agent = Agent(
-    batch_size=args.batch_size,
-    mem_size=args.mem_size,
-    # input_dims=args.input_dims,
-    input_dims=[16],
-    lr=args.lr,
-    gamma=args.gamma,
-    gamma1=args.gamma1,
-    epsilon=args.epsilon,
-    epsilon_dec=args.epsilon_dec,
-    epsilon_min=args.epsilon_min,
-    model_load_file=args.model_load_file,
-    model_save_file=args.model_save_file,
-    model_auto_save=args.model_auto_save,
-    log_dir=args.log_dir,
-    training_epochs=args.training_epochs,
-)
+    agent.learn_on_repeat(args.learn_runs)
 
-agent.learn_on_repeat(args.learn_runs)
+if __name__ == "__main__":
+    main()

@@ -22,12 +22,13 @@ class EdpisodeDB:
         self.mem_cntr = 0
         states_dims = [mem_size]
         states_dims.extend(input_dims)
-        self.states_mem = tf.Variable(tf.constant(0., shape=states_dims, dtype=tf.float32))
-        self.new_states_mem = tf.Variable(tf.constant(0., shape=states_dims, dtype=tf.float32))
-        self.action_mem = tf.Variable(tf.constant(0, shape=(mem_size), dtype=tf.int32))
-        self.reward_mem = tf.Variable(tf.constant(0, shape=(mem_size), dtype=tf.int32))
-        self.score_mem = tf.Variable(tf.constant(0, shape=(mem_size), dtype=tf.int32))
-        self.done_mem = tf.Variable(tf.constant(False, shape=(mem_size), dtype=tf.bool))
+        self.states_mem = tf.Variable(np.zeros(states_dims, np.float32))
+        self.new_states_mem = tf.Variable(np.zeros(states_dims, np.float32))
+
+        self.action_mem = tf.Variable(np.zeros(mem_size, dtype=np.int32))
+        self.reward_mem = tf.Variable(np.zeros(mem_size, dtype=np.float32))
+        self.score_mem = tf.Variable(np.zeros(mem_size, dtype=np.float32))
+        self.done_mem = tf.Variable(np.zeros(mem_size, dtype=np.bool))
 
     def store_episode(self, e, **kwargs):
         ind = self.mem_cntr % self.mem_size
@@ -47,17 +48,17 @@ class EdpisodeDB:
         # Special processing for boolean in done_mem
         done_mem_np = self.done_mem.numpy()
         done_mem_np[ind] = e.done
-        self.done_mem = tf.Variable(tf.constant(done_mem_np))
+        self.done_mem = tf.Variable(done_mem_np)
 
         self.mem_cntr += 1
 
     def get_random_data_batch(self, batch_size):
         total_db_size = min(self.mem_cntr, self.mem_size)
         batch_arr = np.random.choice(total_db_size, batch_size, replace=False)
-        states_batch = tf.Variable(tf.constant(self.states_mem.numpy()[batch_arr]))
-        new_states_batch = tf.Variable(tf.constant(self.new_states_mem.numpy()[batch_arr]))
-        action_batch = tf.Variable(tf.constant(self.action_mem.numpy()[batch_arr]))
-        reward_batch = tf.Variable(tf.constant(self.reward_mem.numpy()[batch_arr]))
-        score_batch = tf.Variable(tf.constant(self.score_mem.numpy()[batch_arr]))
-        done_batch = tf.Variable(tf.constant(self.done_mem.numpy()[batch_arr]))
+        states_batch = tf.Variable(self.states_mem.numpy()[batch_arr])
+        new_states_batch = tf.Variable(self.new_states_mem.numpy()[batch_arr])
+        action_batch = tf.Variable(self.action_mem.numpy()[batch_arr])
+        reward_batch = tf.Variable(self.reward_mem.numpy()[batch_arr])
+        score_batch = tf.Variable(self.score_mem.numpy()[batch_arr])
+        done_batch = tf.Variable(self.done_mem.numpy()[batch_arr])
         return states_batch, new_states_batch, action_batch, reward_batch, score_batch, done_batch
