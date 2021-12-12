@@ -29,6 +29,7 @@ class Game(object):
     """
 
     self._score = initial_score
+    self.move_count = 0
 
     if state is None:
       self._state = np.zeros((4, 4), dtype=np.int)
@@ -87,6 +88,7 @@ class Game(object):
     reward = self._do_action_left(temp_state)
     self._state = np.rot90(temp_state, -action)
     self._score += reward
+    self.move_count += 1
 
     self.add_random_tile()
 

@@ -15,22 +15,9 @@ class Episode:
         self.score = score
         self.done = done
 
-        self.__hash = {}
-        self.__hash["tf_proc_debug"] = False
-        for k in kwargs.keys():
-            self.__hash[k] = kwargs[k]
-
-        tf.debugging.set_log_device_placement(self.__hash["tf_proc_debug"])
-
 
 class EdpisodeDB:
     def __init__(self, mem_size, input_dims, **kwargs):
-        self.__hash = {}
-        self.__hash["tf_proc_debug"] = False
-
-        for k in kwargs.keys():
-            self.__hash[k] = kwargs[k]
-
         self.mem_size = mem_size
         self.mem_cntr = 0
         states_dims = [mem_size]
@@ -43,7 +30,6 @@ class EdpisodeDB:
         self.done_mem = tf.Variable(tf.constant(False, shape=(mem_size), dtype=tf.bool))
 
     def store_episode(self, e, **kwargs):
-        tf.debugging.set_log_device_placement(self.__hash["tf_proc_debug"])
         ind = self.mem_cntr % self.mem_size
         ind_arr = tf.Variable(tf.constant([
             [ind, 0], [ind, 1], [ind, 2], [ind, 3],
@@ -56,6 +42,7 @@ class EdpisodeDB:
         self.new_states_mem.scatter_nd_update(ind_arr, tf.constant(e.next_state, dtype=tf.float32))
         self.action_mem.scatter_nd_update([ind], [e.action])
         self.reward_mem.scatter_nd_update([ind], [e.reward])
+        self.score_mem.scatter_nd_update([ind], [e.score])
 
         # Special processing for boolean in done_mem
         done_mem_np = self.done_mem.numpy()
@@ -65,7 +52,6 @@ class EdpisodeDB:
         self.mem_cntr += 1
 
     def get_random_data_batch(self, batch_size):
-        tf.debugging.set_log_device_placement(self.__hash["tf_proc_debug"])
         total_db_size = min(self.mem_cntr, self.mem_size)
         batch_arr = np.random.choice(total_db_size, batch_size, replace=False)
         states_batch = tf.Variable(tf.constant(self.states_mem.numpy()[batch_arr]))

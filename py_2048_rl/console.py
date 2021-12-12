@@ -4,12 +4,13 @@ import logging
 
 import tensorflow as tf
 
-from py_2048_rl.flex_rl_model.agent import Agent
+from py_2048_rl.agent import Agent
 
 
 # Making sure we are running the main routine.
 if __name__ != "__main__":
-  exit()
+    exit()
+
 
 logger = logging.getLogger('py2048')
 tf_logger = logging.getLogger('tensorflow')
@@ -18,7 +19,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--learn-runs', type=int, default=100, help='Number of model learn runs')
 parser.add_argument('--batch-size', type=int, default=10000,
                     help='Training batch selection size (in number of episodes')
-parser.add_argument('--mem-size', type=int, default=50000,
+parser.add_argument('--mem_size', type=int, default=50000,
                     help='Learning episode DB size (in number of episodes')
 parser.add_argument('--lr', type=float, default=0.0001,
                     help='Learning rate')
@@ -26,8 +27,6 @@ parser.add_argument('--gamma', type=float, default=0.99,
                     help='Gamma')
 parser.add_argument('--gamma1', type=float, default=0.99,
                     help='Gamma1')
-parser.add_argument('--gamma2', type=float, default=0.99,
-                    help='Gamma2')
 parser.add_argument('--epsilon', type=float, default=1.0,
                     help='Epsilon')
 parser.add_argument('--epsilon-min', type=float, default=0.01,
@@ -44,7 +43,7 @@ parser.add_argument('--training-epochs', type=int, default=1,
 parser.add_argument('--model-disable-autosave', default=True, action="store_false",
                     dest="model_auto_save")
 
-parser.add_argument('--log-dir', default="/tmp/logs",
+parser.add_argument('--log-dir', default=None,
                     help='Tensorboard log directory')
 parser.add_argument('--tf-log-device', default=False, action="store_true",
                     help='Determines whether TF compute device info is displayed. Default = False')
@@ -84,6 +83,7 @@ agent = Agent(
     input_dims=[16],
     lr=args.lr,
     gamma=args.gamma,
+    gamma1=args.gamma1,
     epsilon=args.epsilon,
     epsilon_dec=args.epsilon_dec,
     epsilon_min=args.epsilon_min,
@@ -91,7 +91,6 @@ agent = Agent(
     model_save_file=args.model_save_file,
     model_auto_save=args.model_auto_save,
     log_dir=args.log_dir,
-    tf_proc_debug=args.tf_log_device,
     training_epochs=args.training_epochs,
 )
 
