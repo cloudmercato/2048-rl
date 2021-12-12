@@ -90,7 +90,8 @@ class Agent:
         ])
         model.compile(
             optimizer=tf.keras.optimizers.Adam(learning_rate=0.0001),
-            loss=tf.keras.losses.mse
+            loss=tf.keras.losses.mse,
+            metrics=["accuracy"]
         )
 
         self.model = model
