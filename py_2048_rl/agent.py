@@ -80,11 +80,13 @@ class Agent:
         q_target = q_eval.numpy()
 
         batch_index = np.arange(self.batch_size)
-        q_target[batch_index, actions] = tf.math.l2_normalize(
-            rewards +
-            self.gamma * np.max(q_next, axis=1) +
-            self.gamma1 * scores.numpy() +
-            self.gamma2 * scores.numpy() * dones.numpy()
+        q_target[batch_index, actions] = 1 / tf.math.exp(
+            tf.math.l2_normalize(
+                rewards +
+                self.gamma * np.max(q_next, axis=1) +
+                self.gamma1 * scores.numpy() +
+                self.gamma2 * scores.numpy() * dones.numpy()
+            )
         )
 
         callbacks = []
@@ -134,6 +136,11 @@ class Agent:
 
         tf.summary.scalar('Sample maximum: last ' + self.report_sample_size.__str__(),
                           data=max(self.score_sample_arr),
+                          step=run
+                          )
+
+        tf.summary.scalar('Sample range (min to max): last ' + self.report_sample_size.__str__(),
+                          data=max(self.score_sample_arr) - min(self.score_sample_arr),
                           step=run
                           )
 
@@ -205,7 +212,7 @@ class Agent:
 
         actions = self.model.predict(state)
         actions = actions[0][game.available_actions()]
-        return np.argmax(actions)
+        return np.argmin(actions)
 
     def save_model(self):
         self.model.save(self.model_save_file)
