@@ -22,6 +22,8 @@ parser.add_argument('--gamma', type=float, default=0.99,
                     help='Gamma')
 parser.add_argument('--gamma1', type=float, default=0.99,
                     help='Gamma1')
+parser.add_argument('--gamma2', type=float, default=0.99,
+                    help='Gamma1')
 parser.add_argument('--epsilon', type=float, default=1.0,
                     help='Epsilon')
 parser.add_argument('--epsilon-min', type=float, default=0.01,
@@ -81,6 +83,7 @@ def main():
         lr=args.lr,
         gamma=args.gamma,
         gamma1=args.gamma1,
+        gamma2=args.gamma2,
         epsilon=args.epsilon,
         epsilon_dec=args.epsilon_dec,
         epsilon_min=args.epsilon_min,

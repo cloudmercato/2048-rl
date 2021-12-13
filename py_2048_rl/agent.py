@@ -23,6 +23,7 @@ class Agent:
             lr=0.001,
             gamma=0.99,
             gamma1=0.99,
+            gamma2=0.99,
             epsilon=1,
             epsilon_dec=1e-3,
             epsilon_min=0.01,
@@ -39,6 +40,7 @@ class Agent:
         self.lr = lr
         self.gamma = gamma
         self.gamma1 = gamma1
+        self.gamma2 = gamma2
         self.epsilon = epsilon
         self.epsilon_dec = epsilon_dec
         self.epsilon_min = epsilon_min
@@ -85,8 +87,9 @@ class Agent:
         q_target[batch_index, actions] = tf.math.l2_normalize(
             rewards +
             self.gamma * np.max(q_next, axis=1) +
-            self.gamma1 * scores.numpy()
-            + dones.numpy()
+            self.gamma1 * scores.numpy() +
+            self.gamma2 * scores.numpy() *
+            dones.numpy()
         )
 
         callbacks = []
