@@ -53,6 +53,13 @@ class Agent:
             self.input_dims,
         )
 
+        if self.log_dir:
+            self.tb_callback = tf.keras.callbacks.TensorBoard(
+                log_dir=self.log_dir,
+                histogram_freq=1,
+                profile_batch='500,520'
+            )
+
         if self.model_load_file:
             self.model = self.load_model()
         else:
@@ -84,12 +91,7 @@ class Agent:
 
         callbacks = []
         if self.log_dir:
-            tb_callback = tf.keras.callbacks.TensorBoard(
-                log_dir=self.log_dir,
-                histogram_freq=1,
-                profile_batch='500,520'
-            )
-            callbacks.append(tb_callback)
+            callbacks.append(self.tb_callback)
 
         history = self.model.fit(
             states.numpy(),
@@ -97,22 +99,26 @@ class Agent:
             callbacks=callbacks,
             epochs=self.training_epochs
         )
+        # Adjust the epsilon
+        if self.epsilon > self.epsilon_min:
+            self.epsilon = self.epsilon - self.epsilon_dec
         # Log
         tf.summary.scalar('Game score', data=self.last_game_score, step=run)
         tf.summary.scalar('Game move', data=self.last_move_count, step=run)
+        tf.summary.scalar('Epsilon', data=self.epsilon, step=run)
 
         for name in history.history:
             tf.summary.scalar(name, data=history.history[name][-1], step=run)
 
-        # Adjust the epsilon
-        if self.epsilon > self.epsilon_min:
-            self.epsilon = self.epsilon - self.epsilon_dec
-        tf.summary.scalar('Epsilon', data=self.epsilon, step=run)
 
     def learn_on_repeat(self, n_games=1):
         min_score = 0
         max_score = 0
         sum_scores = 0
+
+        if self.log_dir:
+            file_writer = tf.summary.create_file_writer(self.log_dir)
+            file_writer.set_as_default()
 
         for i in range(n_games):
             self.learn(i)
@@ -129,6 +135,11 @@ class Agent:
 
             logger.info('Step %d: min=%s avg=%s last=%s max=%s',
                         i, max_score, avg_score, self.last_game_score, max_score)
+            if self.log_dir:
+                file_writer.flush()
+
+        if self.log_dir:
+            file_writer.close()
 
     def accumulate_episode_data(self):
         # Bail if there's nothing to do.
