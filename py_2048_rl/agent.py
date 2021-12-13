@@ -23,6 +23,7 @@ class Agent:
             lr=0.001,
             gamma=0.99,
             gamma1=0.99,
+            gamma2=0.99,
             epsilon=1,
             epsilon_dec=1e-3,
             epsilon_min=0.01,
@@ -31,6 +32,7 @@ class Agent:
             model_auto_save=True,
             log_dir="/tmp/",
             training_epochs=1,
+            report_sample_size =50,
             **kwargs
         ):
         self.batch_size = batch_size
@@ -39,6 +41,7 @@ class Agent:
         self.lr = lr
         self.gamma = gamma
         self.gamma1 = gamma1
+        self.gamma2 = gamma2
         self.epsilon = epsilon
         self.epsilon_dec = epsilon_dec
         self.epsilon_min = epsilon_min
@@ -47,6 +50,7 @@ class Agent:
         self.model_auto_save = model_auto_save
         self.log_dir = log_dir
         self.training_epochs = training_epochs
+        self.report_sample_size = report_sample_size
 
         self.episode_db = episodes.EdpisodeDB(
             self.mem_size,
@@ -59,7 +63,8 @@ class Agent:
             self.model = models.DEFAULT_MODEL
             self.model.compile(
                 optimizer=tf.keras.optimizers.Adam(learning_rate=self.lr),
-                loss='mean_squared_error'
+                loss='mean_squared_error',
+                metrics=['accuracy']
             )
         self.last_game_score = 0
         self.last_move_count = 0
@@ -78,8 +83,8 @@ class Agent:
         q_target[batch_index, actions] = tf.math.l2_normalize(
             rewards +
             self.gamma * np.max(q_next, axis=1) +
-            self.gamma1 * scores.numpy()
-            + dones.numpy()
+            self.gamma1 * scores.numpy() +
+            self.gamma2 * scores.numpy() * dones.numpy()
         )
 
         callbacks = []
@@ -97,17 +102,46 @@ class Agent:
             callbacks=callbacks,
             epochs=self.training_epochs
         )
-        # Log
-        tf.summary.scalar('Game score', data=self.last_game_score, step=run)
-        tf.summary.scalar('Game move', data=self.last_move_count, step=run)
-
-        for name in history.history:
-            tf.summary.scalar(name, data=history.history[name][-1], step=run)
 
         # Adjust the epsilon
         if self.epsilon > self.epsilon_min:
             self.epsilon = self.epsilon - self.epsilon_dec
+
+        file_writer = tf.summary.create_file_writer(self.log_dir)
+        file_writer.set_as_default()
         tf.summary.scalar('Epsilon', data=self.epsilon, step=run)
+
+        # Log
+        tf.summary.scalar('Game score', data=self.last_game_score, step=run)
+        tf.summary.scalar('Game move', data=self.last_move_count, step=run)
+
+        if run == 0:
+            self.score_sample_arr = []
+
+        self.score_sample_arr.append( self.last_game_score )
+        if run > self.report_sample_size:
+            self.score_sample_arr.pop(0)
+
+        tf.summary.scalar('Sample minimum: last ' + self.report_sample_size.__str__(),
+                          data=min(self.score_sample_arr),
+                          step=run
+                          )
+
+        tf.summary.scalar('Sample average: last ' + self.report_sample_size.__str__(),
+                          data=sum(self.score_sample_arr)/len(self.score_sample_arr),
+                          step=run
+                          )
+
+        tf.summary.scalar('Sample maximum: last ' + self.report_sample_size.__str__(),
+                          data=max(self.score_sample_arr),
+                          step=run
+                          )
+
+        for name in history.history:
+            tf.summary.scalar(name, data=history.history[name][-1], step=run)
+
+        # Close the writer
+        file_writer.close()
 
     def learn_on_repeat(self, n_games=1):
         min_score = 0
