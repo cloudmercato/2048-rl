@@ -11,6 +11,7 @@ logger = logging.getLogger('py2048')
 tf_logger = logging.getLogger('tensorflow')
 
 parser = argparse.ArgumentParser()
+parser.add_argument('action', default='train', choices=('train', 'infer'), nargs='?')
 parser.add_argument('--learn-runs', type=int, default=100, help='Number of model learn runs')
 parser.add_argument('--batch-size', type=int, default=10000,
                     help='Training batch selection size (in number of episodes')
@@ -23,7 +24,7 @@ parser.add_argument('--gamma', type=float, default=0.99,
 parser.add_argument('--gamma1', type=float, default=0.99,
                     help='Gamma1')
 parser.add_argument('--gamma2', type=float, default=0.99,
-                    help='Gamma1')
+                    help='Gamma2')
 parser.add_argument('--epsilon', type=float, default=1.0,
                     help='Epsilon')
 parser.add_argument('--epsilon-min', type=float, default=0.01,
@@ -94,7 +95,10 @@ def main():
         training_epochs=args.training_epochs,
     )
 
-    agent.learn_on_repeat(args.learn_runs)
+    if args.action == 'train':
+        agent.learn_on_repeat(args.learn_runs)
+    elif args.action == 'infer':
+        agent.play_on_repeat(args.learn_runs)
 
 if __name__ == "__main__":
     main()

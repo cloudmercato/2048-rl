@@ -63,15 +63,24 @@ class Agent:
             )
 
         if self.model_load_file:
-            self.model = self.load_model()
+            try:
+                self.model = self.load_model()
+            except OSError as err:
+                logger.warning("Cannot load model %s: %s", self.model_load_file, err)
+                logger.warning("Building new model")
+                self.model = self._make_model()
         else:
-            self.model = models.DEFAULT_MODEL
-            self.model.compile(
-                optimizer=tf.keras.optimizers.Adam(learning_rate=self.lr),
-                loss='mean_squared_error'
-            )
+            self.model = self._make_model()
         self.last_game_score = 0
         self.last_move_count = 0
+
+    def _make_model(self):
+        model = models.DEFAULT_MODEL
+        model.compile(
+            optimizer=tf.keras.optimizers.Adam(learning_rate=self.lr),
+            loss='mean_squared_error'
+        )
+        return model
 
     def learn(self, run):
         self.accumulate_episode_data()
@@ -112,7 +121,6 @@ class Agent:
 
         for name in history.history:
             tf.summary.scalar(name, data=history.history[name][-1], step=run)
-
 
     def learn_on_repeat(self, n_games=1):
         min_score = 0
@@ -183,9 +191,42 @@ class Agent:
         state = game.state()
         state = np.matrix.reshape(state, (1, 16))
 
-        actions = self.model.predict(state)
-        actions = actions[0][game.available_actions()]
-        return np.argmax(actions)
+        pred_actions = self.model.predict(state)[0].tolist()
+        avai_actions = game.available_actions()
+        while pred_actions:
+            pred_action = np.argmax(pred_actions)
+            if pred_action in avai_actions:
+                return pred_action
+            pred_actions[pred_action] = min(pred_actions)
+
+    def play_on_repeat(self, n_games=1):
+        min_score = 0
+        max_score = 0
+        sum_scores = 0
+
+        if self.log_dir:
+            file_writer = tf.summary.create_file_writer(self.log_dir)
+            file_writer.set_as_default()
+
+        for i in range(n_games):
+            self.play_game(self.action_greedy_epsilon)
+
+            if self.model_auto_save:
+                self.save_model()
+
+            if i != 0:
+                min_score = min(min_score, self.last_game_score)
+            max_score = max(max_score, self.last_game_score)
+            sum_scores += self.last_game_score
+            avg_score = sum_scores / (i+1)
+
+            logger.info('Step %d: min=%s avg=%s last=%s max=%s',
+                        i, max_score, avg_score, self.last_game_score, max_score)
+            if self.log_dir:
+                file_writer.flush()
+
+        if self.log_dir:
+            file_writer.close()
 
     def save_model(self):
         self.model.save(self.model_save_file)
