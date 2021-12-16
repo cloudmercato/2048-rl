@@ -24,6 +24,7 @@ class Agent:
             gamma=0.99,
             gamma1=0.99,
             gamma2=0.99,
+            gamma3=0.99,
             epsilon=1,
             epsilon_dec=1e-3,
             epsilon_min=0.01,
@@ -42,6 +43,7 @@ class Agent:
         self.gamma = gamma
         self.gamma1 = gamma1
         self.gamma2 = gamma2
+        self.gamma3 = gamma3
         self.epsilon = epsilon
         self.epsilon_dec = epsilon_dec
         self.epsilon_min = epsilon_min
@@ -72,7 +74,7 @@ class Agent:
     def learn(self, run):
         self.accumulate_episode_data()
 
-        states, states_, actions, rewards, scores, dones = \
+        states, states_, actions, rewards, scores, n_moves, dones = \
             self.episode_db.get_random_data_batch(self.batch_size)
 
         q_eval = tf.Variable(self.model.predict(states.numpy()))
@@ -80,12 +82,15 @@ class Agent:
         q_target = q_eval.numpy()
 
         batch_index = np.arange(self.batch_size)
-        q_target[batch_index, actions] = 1 / tf.math.exp(
-            tf.math.l2_normalize(
-                rewards +
-                self.gamma * np.max(q_next, axis=1) +
-                self.gamma1 * scores.numpy() +
-                self.gamma2 * scores.numpy() * dones.numpy()
+        q_target[batch_index, actions] = tf.math.l2_normalize(
+            1 / tf.math.exp(
+                tf.math.l2_normalize(
+                    rewards +
+                    self.gamma * np.max(q_next, axis=1) +
+                    self.gamma1 * scores.numpy() +
+                    self.gamma2 * scores.numpy() * dones.numpy() +
+                    self.gamma3 * n_moves.numpy()
+                )
             )
         )
 
@@ -111,6 +116,7 @@ class Agent:
 
         file_writer = tf.summary.create_file_writer(self.log_dir)
         file_writer.set_as_default()
+
         tf.summary.scalar('Epsilon', data=self.epsilon, step=run)
 
         # Log
@@ -196,6 +202,7 @@ class Agent:
                 action=action,
                 reward=reward,
                 score=game.score(),
+                n_moves = game.move_count,
                 done=game.game_over()
             )
             self.episode_db.store_episode(episode)
@@ -211,8 +218,9 @@ class Agent:
         state = np.matrix.reshape(state, (1, 16))
 
         actions = self.model.predict(state)
-        actions = actions[0][game.available_actions()]
-        return np.argmin(actions)
+        avail_index = game.available_actions()
+        avail_actions = actions[0][avail_index]
+        return avail_index[np.argmin(avail_actions)]
 
     def save_model(self):
         self.model.save(self.model_save_file)
