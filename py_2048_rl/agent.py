@@ -31,6 +31,7 @@ class Agent:
             model_load_file=None,
             model_save_file='model.h5',
             model_auto_save=True,
+            model_collect_random_data=True,
             log_dir="/tmp/",
             training_epochs=1,
             **kwargs
@@ -49,6 +50,7 @@ class Agent:
         self.model_load_file = model_load_file
         self.model_save_file = model_save_file
         self.model_auto_save = model_auto_save
+        self.model_collect_random_data = model_collect_random_data
         self.log_dir = log_dir
         self.training_epochs = training_epochs
 
@@ -85,7 +87,12 @@ class Agent:
         return model
 
     def learn(self, run):
-        self.accumulate_episode_data()
+        if self.model_collect_random_data:
+            self.accumulate_episode_data()
+
+        # Exit if no data to learn from
+        if self.episode_db.mem_cntr == 0:
+            return
 
         states, states_, actions, rewards, scores, n_moves, dones = \
             self.episode_db.get_random_data_batch(self.batch_size)
@@ -162,6 +169,9 @@ class Agent:
     def accumulate_episode_data(self):
         # Bail if there's nothing to do.
         if self.episode_db.mem_cntr >= self.batch_size:
+            return
+
+        if not self.model_collect_random_data:
             return
 
         logger.debug("Initial data accumulation. Collection size = %s episodes.",
