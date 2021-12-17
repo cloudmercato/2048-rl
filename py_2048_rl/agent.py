@@ -24,6 +24,7 @@ class Agent:
             gamma=0.99,
             gamma1=0.99,
             gamma2=0.99,
+            gamma3=0.99,
             epsilon=1,
             epsilon_dec=1e-3,
             epsilon_min=0.01,
@@ -41,6 +42,7 @@ class Agent:
         self.gamma = gamma
         self.gamma1 = gamma1
         self.gamma2 = gamma2
+        self.gamma3 = gamma3
         self.epsilon = epsilon
         self.epsilon_dec = epsilon_dec
         self.epsilon_min = epsilon_min
@@ -85,7 +87,7 @@ class Agent:
     def learn(self, run):
         self.accumulate_episode_data()
 
-        states, states_, actions, rewards, scores, dones = \
+        states, states_, actions, rewards, scores, n_moves, dones = \
             self.episode_db.get_random_data_batch(self.batch_size)
 
         q_eval = tf.Variable(self.model.predict(states.numpy()))
@@ -98,7 +100,8 @@ class Agent:
             self.gamma * np.max(q_next, axis=1) +
             self.gamma1 * scores.numpy() +
             self.gamma2 * scores.numpy() *
-            dones.numpy()
+            dones.numpy() +
+            self.gamma3 * n_moves.numpy()
         )
 
         callbacks = []
@@ -177,6 +180,7 @@ class Agent:
                 action=action,
                 reward=reward,
                 score=game.score,
+                n_moves=game.move_count,
                 done=game.game_over()
             )
             self.episode_db.store_episode(episode)

@@ -7,12 +7,13 @@ logger = logging.getLogger('py2048')
 
 
 class Episode:
-    def __init__(self, state, next_state, action, reward, score, done, **kwargs):
+    def __init__(self, state, next_state, action, reward, score, n_moves, done, **kwargs):
         self.state = state
         self.next_state = next_state
         self.action = action
         self.reward = reward
         self.score = score
+        self.n_moves = n_moves
         self.done = done
 
 
@@ -28,6 +29,7 @@ class EdpisodeDB:
         self.action_mem = tf.Variable(np.zeros(mem_size, dtype=np.int32))
         self.reward_mem = tf.Variable(np.zeros(mem_size, dtype=np.float32))
         self.score_mem = tf.Variable(np.zeros(mem_size, dtype=np.float32))
+        self.n_moves_mem = tf.Variable(np.zeros(mem_size, dtype=np.float32))
         self.done_mem = tf.Variable(np.zeros(mem_size, dtype=np.bool))
 
     def store_episode(self, e, **kwargs):
@@ -60,5 +62,6 @@ class EdpisodeDB:
         action_batch = tf.Variable(self.action_mem.numpy()[batch_arr])
         reward_batch = tf.Variable(self.reward_mem.numpy()[batch_arr])
         score_batch = tf.Variable(self.score_mem.numpy()[batch_arr])
+        n_moves_batch = tf.Variable(self.n_moves_mem.numpy()[batch_arr])
         done_batch = tf.Variable(self.done_mem.numpy()[batch_arr])
-        return states_batch, new_states_batch, action_batch, reward_batch, score_batch, done_batch
+        return states_batch, new_states_batch, action_batch, reward_batch, score_batch, n_moves_batch, done_batch
