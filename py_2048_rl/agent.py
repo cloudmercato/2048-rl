@@ -96,12 +96,16 @@ class Agent:
 
         batch_index = np.arange(self.batch_size)
         q_target[batch_index, actions] = tf.math.l2_normalize(
-            rewards +
-            self.gamma * np.max(q_next, axis=1) +
-            self.gamma1 * scores.numpy() +
-            self.gamma2 * scores.numpy() *
-            dones.numpy() +
-            self.gamma3 * n_moves.numpy()
+            1/tf.math.exp(
+                tf.math.l2_normalize(
+                    rewards +
+                    self.gamma * np.max(q_next, axis=1) +
+                    self.gamma1 * scores.numpy() +
+                    self.gamma2 * scores.numpy() *
+                    dones.numpy() +
+                    self.gamma3 * n_moves.numpy()
+                )
+            )
         )
 
         callbacks = []
@@ -195,13 +199,9 @@ class Agent:
         state = game.state()
         state = np.matrix.reshape(state, (1, 16))
 
-        pred_actions = self.model.predict(state)[0].tolist()
+        pred_actions = self.model.predict(state)[0]
         avai_actions = game.available_actions()
-        while pred_actions:
-            pred_action = np.argmax(pred_actions)
-            if pred_action in avai_actions:
-                return pred_action
-            pred_actions[pred_action] = min(pred_actions)
+        return avai_actions[np.argmin(pred_actions[avai_actions])]
 
     def play_on_repeat(self, n_games=1):
         min_score = 0
