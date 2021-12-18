@@ -225,9 +225,6 @@ class Agent:
         for i in range(n_games):
             self.play_game(self.action_greedy_epsilon)
 
-            if self.model_auto_save:
-                self.save_model()
-
             if i != 0:
                 min_score = min(min_score, self.last_game_score)
             max_score = max(max_score, self.last_game_score)

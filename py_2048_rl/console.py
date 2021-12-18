@@ -40,7 +40,7 @@ parser.add_argument('--model-save-file', default='model.h5',
                     help='Model save file path (h5)')
 parser.add_argument('--training-epochs', type=int, default=1,
                     help='Number of epoch rns for every model training run')
-parser.add_argument('--model-disable-autosave', default=True, action="store_false",
+parser.add_argument('--model-auto-save', default=True, action="store_false",
                     dest="model_auto_save")
 parser.add_argument('--model-collect-random-data', default=True,
                     dest="model_collect_random_data")
