@@ -208,6 +208,9 @@ class Agent:
         if np.random.random() < self.epsilon:
             return random_action_callback(game)
 
+        return self.action_greedy(game)
+
+    def action_greedy(self, game):
         state = game.state()
         state = np.matrix.reshape(state, (1, 16))
 
