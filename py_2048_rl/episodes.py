@@ -56,7 +56,8 @@ class EdpisodeDB:
 
     def get_random_data_batch(self, batch_size):
         total_db_size = min(self.mem_cntr, self.mem_size)
-        batch_arr = np.random.choice(total_db_size, batch_size, replace=False)
+        sel_size = min(total_db_size, batch_size)
+        batch_arr = np.random.choice(total_db_size, sel_size, replace=False)
         states_batch = tf.Variable(self.states_mem.numpy()[batch_arr])
         new_states_batch = tf.Variable(self.new_states_mem.numpy()[batch_arr])
         action_batch = tf.Variable(self.action_mem.numpy()[batch_arr])
@@ -64,4 +65,4 @@ class EdpisodeDB:
         score_batch = tf.Variable(self.score_mem.numpy()[batch_arr])
         n_moves_batch = tf.Variable(self.n_moves_mem.numpy()[batch_arr])
         done_batch = tf.Variable(self.done_mem.numpy()[batch_arr])
-        return states_batch, new_states_batch, action_batch, reward_batch, score_batch, n_moves_batch, done_batch
+        return sel_size, states_batch, new_states_batch, action_batch, reward_batch, score_batch, n_moves_batch, done_batch

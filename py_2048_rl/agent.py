@@ -69,6 +69,8 @@ class Agent:
         if self.model_load_file:
             try:
                 self.model = self.load_model()
+                # Disabling pre-loading random data for model pre-loaded from file.
+                self.model_collect_random_data = False
             except OSError as err:
                 logger.warning("Cannot load model %s: %s", self.model_load_file, err)
                 logger.warning("Building new model")
@@ -94,14 +96,14 @@ class Agent:
         if self.episode_db.mem_cntr == 0:
             return
 
-        states, states_, actions, rewards, scores, n_moves, dones = \
+        sel_size, states, states_, actions, rewards, scores, n_moves, dones = \
             self.episode_db.get_random_data_batch(self.batch_size)
 
         q_eval = tf.Variable(self.model.predict(states.numpy()))
         q_next = tf.Variable(self.model.predict(states_.numpy()))
         q_target = q_eval.numpy()
 
-        batch_index = np.arange(self.batch_size)
+        batch_index = np.arange(sel_size)
         q_target[batch_index, actions] = tf.math.l2_normalize(
             1/tf.math.exp(
                 tf.math.l2_normalize(
