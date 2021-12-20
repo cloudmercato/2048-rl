@@ -13,6 +13,7 @@ tf_logger = logging.getLogger('tensorflow')
 parser = argparse.ArgumentParser()
 parser.add_argument('action', default='train', choices=('train', 'infer'), nargs='?')
 parser.add_argument('--learn-runs', type=int, default=100, help='Number of model learn runs')
+parser.add_argument('--games-per-cycle', type=int, default=1, help='Number of games per model learn run/cycle')
 parser.add_argument('--batch-size', type=int, default=10000,
                     help='Training batch selection size (in number of episodes')
 parser.add_argument('--mem-size', type=int, default=50000,
@@ -44,6 +45,8 @@ parser.add_argument('--model-auto-save', default=True, action="store_false",
                     dest="model_auto_save")
 parser.add_argument('--model-collect-random-data', default=True,
                     dest="model_collect_random_data")
+parser.add_argument('--refill-episode-db', default=False,
+                    dest="refill_episode_db")
 
 parser.add_argument('--log-dir', default=None,
                     help='Tensorboard log directory')
@@ -102,7 +105,11 @@ def main():
     )
 
     if args.action == 'train':
-        agent.learn_on_repeat(args.learn_runs)
+        agent.learn_on_repeat(n_cycles=args.learn_runs,
+                              games_per_cycle=args.games_per_cycle,
+                              refill_episode_db=args.refill_episode_db
+                              )
+
     elif args.action == 'infer':
         agent.play_on_repeat(args.learn_runs)
 
