@@ -30,6 +30,7 @@ class Agent:
             model_load_file=None,
             model_save_file='model.h5',
             model_auto_save=True,
+            model_collect_random_data=True,
             log_dir="/tmp/",
             training_epochs=1,
             **kwargs
@@ -47,6 +48,7 @@ class Agent:
         self.model_load_file = model_load_file
         self.model_save_file = model_save_file
         self.model_auto_save = model_auto_save
+        self.model_collect_random_data = model_collect_random_data
         self.log_dir = log_dir
         self.training_epochs = training_epochs
 
@@ -83,16 +85,21 @@ class Agent:
         return model
 
     def learn(self, run):
-        self.accumulate_episode_data()
+        if self.model_collect_random_data:
+            self.accumulate_episode_data()
 
-        states, states_, actions, rewards, scores, dones = \
+        # Exit if no data to learn from
+        if self.episode_db.mem_cntr == 0:
+            return
+
+        real_batch_size, states, states_, actions, rewards, scores, dones = \
             self.episode_db.get_random_data_batch(self.batch_size)
 
         q_eval = tf.Variable(self.model.predict(states.numpy()))
         q_next = tf.Variable(self.model.predict(states_.numpy()))
         q_target = q_eval.numpy()
 
-        batch_index = np.arange(self.batch_size)
+        batch_index = np.arange(real_batch_size)
         q_target[batch_index, actions] = tf.math.l2_normalize(
             rewards +
             self.gamma * np.max(q_next, axis=1) +
@@ -133,9 +140,12 @@ class Agent:
 
         for i in range(n_games):
             self.learn(i)
+            data_present = self.episode_db.mem_cntr > 0
+
             self.play_game(self.action_greedy_epsilon)
 
-            if self.model_auto_save:
+            # Save model if requested.
+            if self.model_auto_save and data_present:
                 self.save_model()
 
             if i != 0:
@@ -155,6 +165,9 @@ class Agent:
     def accumulate_episode_data(self):
         # Bail if there's nothing to do.
         if self.episode_db.mem_cntr >= self.batch_size:
+            return
+
+        if not self.model_collect_random_data:
             return
 
         logger.debug("Initial data accumulation. Collection size = %s episodes.",

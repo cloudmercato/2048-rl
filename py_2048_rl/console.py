@@ -15,7 +15,7 @@ parser.add_argument('action', default='train', choices=('train', 'infer'), nargs
 parser.add_argument('--learn-runs', type=int, default=100, help='Number of model learn runs')
 parser.add_argument('--batch-size', type=int, default=10000,
                     help='Training batch selection size (in number of episodes')
-parser.add_argument('--mem_size', type=int, default=50000,
+parser.add_argument('--mem-size', type=int, default=50000,
                     help='Learning episode DB size (in number of episodes')
 parser.add_argument('--lr', type=float, default=0.0001,
                     help='Learning rate')
@@ -40,7 +40,8 @@ parser.add_argument('--training-epochs', type=int, default=1,
                     help='Number of epoch rns for every model training run')
 parser.add_argument('--model-disable-autosave', default=True, action="store_false",
                     dest="model_auto_save")
-
+parser.add_argument('--disable-collect-random-data', default=True, action="store_false",
+                    dest="model_collect_random_data")
 parser.add_argument('--log-dir', default=None,
                     help='Tensorboard log directory')
 parser.add_argument('--tf-log-device', default=False, action="store_true",
@@ -91,6 +92,7 @@ def main():
         model_load_file=args.model_load_file,
         model_save_file=args.model_save_file,
         model_auto_save=args.model_auto_save,
+        model_collect_random_data=args.model_collect_random_data,
         log_dir=args.log_dir,
         training_epochs=args.training_epochs,
     )
