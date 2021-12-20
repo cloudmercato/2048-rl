@@ -1,3 +1,4 @@
+import importlib
 import logging
 
 import tensorflow as tf
@@ -5,7 +6,6 @@ import numpy as np
 
 from py_2048_game import Game
 from py_2048_rl import episodes
-from py_2048_rl import models
 
 logger = logging.getLogger('py2048')
 
@@ -28,6 +28,7 @@ class Agent:
             epsilon=1,
             epsilon_dec=1e-3,
             epsilon_min=0.01,
+            model_path='py_2048_rl.models.DEFAULT_MODEL',
             model_load_file=None,
             model_save_file='model.h5',
             model_auto_save=True,
@@ -46,6 +47,7 @@ class Agent:
         self.epsilon = epsilon
         self.epsilon_dec = epsilon_dec
         self.epsilon_min = epsilon_min
+        self.model_path = model_path
         self.model_load_file = model_load_file
         self.model_save_file = model_save_file
         self.model_auto_save = model_auto_save
@@ -73,11 +75,15 @@ class Agent:
                 self.model = self._make_model()
         else:
             self.model = self._make_model()
+
         self.last_game_score = 0
         self.last_move_count = 0
 
     def _make_model(self):
-        model = models.DEFAULT_MODEL
+        class_name = self.model_path.split('.')[-1]
+        module_path = '.'.join([i for i in self.model_path.split('.')][:-1])
+        models = importlib.import_module(module_path)
+        model = getattr(models, class_name)
         model.compile(
             optimizer=tf.keras.optimizers.Adam(learning_rate=self.lr),
             loss='mean_squared_error'
@@ -175,9 +181,9 @@ class Agent:
 
         while not game.game_over():
             action = action_callback(game)
-            state = np.matrix.flatten(game.state())
+            state = np.matrix.flatten(game.state)
             reward = game.do_action(action)
-            state_ = np.matrix.flatten(game.state())
+            state_ = np.matrix.flatten(game.state)
             episode = episodes.Episode(
                 state=state,
                 next_state=state_,
@@ -196,7 +202,7 @@ class Agent:
         if np.random.random() < self.epsilon:
             return random_action_callback(game)
 
-        state = game.state()
+        state = game.state
         state = np.matrix.reshape(state, (1, 16))
 
         pred_actions = self.model.predict(state)[0]
