@@ -40,9 +40,8 @@ parser.add_argument('--training-epochs', type=int, default=1,
                     help='Number of epoch rns for every model training run')
 parser.add_argument('--model-disable-autosave', default=True, action="store_false",
                     dest="model_auto_save")
-parser.add_argument('--model-collect-random-data', default=True,
+parser.add_argument('--disable-collect-random-data', default=True, action="store_false",
                     dest="model_collect_random_data")
-
 parser.add_argument('--log-dir', default=None,
                     help='Tensorboard log directory')
 parser.add_argument('--tf-log-device', default=False, action="store_true",

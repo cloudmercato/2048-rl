@@ -92,14 +92,14 @@ class Agent:
         if self.episode_db.mem_cntr == 0:
             return
 
-        states, states_, actions, rewards, scores, dones = \
+        real_batch_size, states, states_, actions, rewards, scores, dones = \
             self.episode_db.get_random_data_batch(self.batch_size)
 
         q_eval = tf.Variable(self.model.predict(states.numpy()))
         q_next = tf.Variable(self.model.predict(states_.numpy()))
         q_target = q_eval.numpy()
 
-        batch_index = np.arange(self.batch_size)
+        batch_index = np.arange(real_batch_size)
         q_target[batch_index, actions] = tf.math.l2_normalize(
             rewards +
             self.gamma * np.max(q_next, axis=1) +
@@ -140,9 +140,12 @@ class Agent:
 
         for i in range(n_games):
             self.learn(i)
+            data_present = self.episode_db.mem_cntr > 0
+
             self.play_game(self.action_greedy_epsilon)
 
-            if self.model_auto_save:
+            # Save model if requested.
+            if self.model_auto_save and data_present:
                 self.save_model()
 
             if i != 0:
