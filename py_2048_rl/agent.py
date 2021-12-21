@@ -1,4 +1,3 @@
-import importlib
 import logging
 
 import tensorflow as tf
@@ -6,6 +5,7 @@ import numpy as np
 
 from py_2048_game import Game
 from py_2048_rl import episodes
+from py_2048_rl import models
 
 logger = logging.getLogger('py2048')
 
@@ -24,14 +24,13 @@ class Agent:
             gamma=0.99,
             gamma1=0.99,
             gamma2=0.99,
-            gamma3=0.99,
             epsilon=1,
             epsilon_dec=1e-3,
             epsilon_min=0.01,
-            model_path='py_2048_rl.models.DEFAULT_MODEL',
             model_load_file=None,
             model_save_file='model.h5',
             model_auto_save=True,
+            model_collect_random_data=True,
             log_dir="/tmp/",
             training_epochs=1,
             **kwargs
@@ -43,14 +42,13 @@ class Agent:
         self.gamma = gamma
         self.gamma1 = gamma1
         self.gamma2 = gamma2
-        self.gamma3 = gamma3
         self.epsilon = epsilon
         self.epsilon_dec = epsilon_dec
         self.epsilon_min = epsilon_min
-        self.model_path = model_path
         self.model_load_file = model_load_file
         self.model_save_file = model_save_file
         self.model_auto_save = model_auto_save
+        self.model_collect_random_data = model_collect_random_data
         self.log_dir = log_dir
         self.training_epochs = training_epochs
 
@@ -75,15 +73,11 @@ class Agent:
                 self.model = self._make_model()
         else:
             self.model = self._make_model()
-
         self.last_game_score = 0
         self.last_move_count = 0
 
     def _make_model(self):
-        class_name = self.model_path.split('.')[-1]
-        module_path = '.'.join([i for i in self.model_path.split('.')][:-1])
-        models = importlib.import_module(module_path)
-        model = getattr(models, class_name)
+        model = models.DEFAULT_MODEL
         model.compile(
             optimizer=tf.keras.optimizers.Adam(learning_rate=self.lr),
             loss='mean_squared_error'
@@ -91,27 +85,27 @@ class Agent:
         return model
 
     def learn(self, run):
-        self.accumulate_episode_data()
+        if self.model_collect_random_data:
+            self.accumulate_episode_data()
 
-        states, states_, actions, rewards, scores, n_moves, dones = \
+        # Exit if no data to learn from
+        if self.episode_db.mem_cntr == 0:
+            return
+
+        real_batch_size, states, states_, actions, rewards, scores, dones = \
             self.episode_db.get_random_data_batch(self.batch_size)
 
         q_eval = tf.Variable(self.model.predict(states.numpy()))
         q_next = tf.Variable(self.model.predict(states_.numpy()))
         q_target = q_eval.numpy()
 
-        batch_index = np.arange(self.batch_size)
+        batch_index = np.arange(real_batch_size)
         q_target[batch_index, actions] = tf.math.l2_normalize(
-            1/tf.math.exp(
-                tf.math.l2_normalize(
-                    rewards +
-                    self.gamma * np.max(q_next, axis=1) +
-                    self.gamma1 * scores.numpy() +
-                    self.gamma2 * scores.numpy() *
-                    dones.numpy() +
-                    self.gamma3 * n_moves.numpy()
-                )
-            )
+            rewards +
+            self.gamma * np.max(q_next, axis=1) +
+            self.gamma1 * scores.numpy() +
+            self.gamma2 * scores.numpy() *
+            dones.numpy()
         )
 
         callbacks = []
@@ -146,9 +140,12 @@ class Agent:
 
         for i in range(n_games):
             self.learn(i)
+            data_present = self.episode_db.mem_cntr > 0
+
             self.play_game(self.action_greedy_epsilon)
 
-            if self.model_auto_save:
+            # Save model if requested.
+            if self.model_auto_save and data_present:
                 self.save_model()
 
             if i != 0:
@@ -170,6 +167,9 @@ class Agent:
         if self.episode_db.mem_cntr >= self.batch_size:
             return
 
+        if not self.model_collect_random_data:
+            return
+
         logger.debug("Initial data accumulation. Collection size = %s episodes.",
                      self.mem_size)
         while self.episode_db.mem_cntr < self.batch_size:
@@ -181,16 +181,15 @@ class Agent:
 
         while not game.game_over():
             action = action_callback(game)
-            state = np.matrix.flatten(game.state)
+            state = np.matrix.flatten(game.state())
             reward = game.do_action(action)
-            state_ = np.matrix.flatten(game.state)
+            state_ = np.matrix.flatten(game.state())
             episode = episodes.Episode(
                 state=state,
                 next_state=state_,
                 action=action,
                 reward=reward,
                 score=game.score,
-                n_moves=game.move_count,
                 done=game.game_over()
             )
             self.episode_db.store_episode(episode)
@@ -202,12 +201,16 @@ class Agent:
         if np.random.random() < self.epsilon:
             return random_action_callback(game)
 
-        state = game.state
+        state = game.state()
         state = np.matrix.reshape(state, (1, 16))
 
-        pred_actions = self.model.predict(state)[0]
+        pred_actions = self.model.predict(state)[0].tolist()
         avai_actions = game.available_actions()
-        return avai_actions[np.argmin(pred_actions[avai_actions])]
+        while pred_actions:
+            pred_action = np.argmax(pred_actions)
+            if pred_action in avai_actions:
+                return pred_action
+            pred_actions[pred_action] = min(pred_actions)
 
     def play_on_repeat(self, n_games=1):
         min_score = 0
