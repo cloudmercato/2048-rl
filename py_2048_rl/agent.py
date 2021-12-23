@@ -267,8 +267,11 @@ class Agent:
             avg_score = sum_scores / (i+1)
 
             logger.info('Step %d: min=%s avg=%s last=%s max=%s',
-                        i, max_score, avg_score, self.last_game_score, max_score)
+                        i, min_score, avg_score, self.last_game_score, max_score)
+
             if self.log_dir:
+                tf.summary.scalar('Game move (inference)', data=self.last_move_count, step=i)
+                tf.summary.scalar('Game score (inference)', data=self.last_game_score, step=i)
                 file_writer.flush()
 
         if self.log_dir:
