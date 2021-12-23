@@ -232,6 +232,9 @@ class Agent:
         if np.random.random() < self.epsilon:
             return random_action_callback(game)
 
+        return self.action_greedy(game)
+
+    def action_greedy(self, game):
         state = game.state
         state = np.matrix.reshape(state, (1, 16))
 
@@ -249,7 +252,7 @@ class Agent:
             file_writer.set_as_default()
 
         for i in range(n_games):
-            self.play_game(self.action_greedy_epsilon)
+            self.play_game(self.action_greedy)
 
             if self.model_auto_save:
                 self.save_model()
