@@ -82,6 +82,13 @@ class Agent:
         self.last_game_score = 0
         self.last_move_count = 0
 
+    def adapt_epsilon(self):
+        val = self.epsilon
+        if self.epsilon > self.epsilon_min:
+            self.epsilon = self.epsilon - self.epsilon_dec
+
+        return val
+
     def _make_model(self):
         class_name = self.model_path.split('.')[-1]
         module_path = '.'.join([i for i in self.model_path.split('.')][:-1])
@@ -132,9 +139,7 @@ class Agent:
             callbacks=callbacks,
             epochs=self.training_epochs
         )
-        # Adjust the epsilon
-        if self.epsilon > self.epsilon_min:
-            self.epsilon = self.epsilon - self.epsilon_dec
+
         # Log
         tf.summary.scalar('Game score', data=self.last_game_score, step=run)
         tf.summary.scalar('Game move', data=self.last_move_count, step=run)
@@ -229,7 +234,7 @@ class Agent:
         self.last_move_count = game.move_count
 
     def action_greedy_epsilon(self, game):
-        if np.random.random() < self.epsilon:
+        if np.random.random() < self.adapt_epsilon():
             return random_action_callback(game)
 
         return self.action_greedy(game)
