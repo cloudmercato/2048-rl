@@ -287,3 +287,7 @@ class Agent:
 
     def load_model(self):
         return tf.keras.models.load_model(self.model_load_file)
+
+
+def get_default_agent(env):
+    return Agent(**env)
