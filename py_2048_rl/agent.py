@@ -35,6 +35,8 @@ class Agent:
             model_collect_random_data=True,
             log_dir="/tmp/",
             training_epochs=1,
+            game_qc_threshold=0.5,
+            game_max_replay_on_fail=50,
             **kwargs
         ):
         self.batch_size = batch_size
@@ -55,6 +57,8 @@ class Agent:
         self.model_collect_random_data = model_collect_random_data
         self.log_dir = log_dir
         self.training_epochs = training_epochs
+        self.game_qc_threshold = game_qc_threshold
+        self.game_max_replay_on_fail = game_max_replay_on_fail
 
         self.episode_db = episodes.EdpisodeDB(
             self.mem_size,
@@ -81,6 +85,9 @@ class Agent:
         self.game_count = 0
         self.last_game_score = 0
         self.last_move_count = 0
+        self.q_val_opt_max=True
+        self.max_game_score = 0
+        self.min_game_score = 0
 
     def adapt_epsilon(self):
         val = self.epsilon
@@ -208,30 +215,101 @@ class Agent:
         logger.debug("Initial data accumulation. Collection size = %s episodes.",
                      self.mem_size)
         while self.episode_db.mem_cntr < self.batch_size:
-            self.play_game(random_action_callback)
+            self.play_game(random_action_callback, replay_on_fail=False)
         logger.debug("Initial data accumulation completed.")
 
-    def play_game(self, action_callback):
-        game = Game()
+    def game_qc(self, game):
+        if game.score < self.game_qc_threshold * self.max_game_score:
+            return False
 
-        while not game.game_over():
-            action = action_callback(game)
-            state = np.matrix.flatten(game.state)
-            reward = game.do_action(action)
-            state_ = np.matrix.flatten(game.state)
-            episode = episodes.Episode(
-                state=state,
-                next_state=state_,
-                action=action,
-                reward=reward,
-                score=game.score,
-                n_moves=game.move_count,
-                done=game.game_over()
-            )
-            self.episode_db.store_episode(episode)
+        return True
 
-        self.last_game_score = game.score
-        self.last_move_count = game.move_count
+    def play_game(self,
+                  action_callback,
+                  replay_on_fail=True,
+                  max_replays=0,
+                  record_in_episode_db=True
+                  ):
+        replay_cnt = 0
+        top_cnt = 0
+        prev_top_cnt = 0
+        top_move_cnt = 0
+
+        replay_lim = max_replays
+
+        #
+        # Defaulting to self.game_max_replay_on_fail
+        # ig max_replays not specified.
+        #
+        if max_replays == 0:
+            replay_lim = self.game_max_replay_on_fail
+
+        if replay_on_fail and replay_lim == 0:
+            replay_lim = self.game_max_replay_on_fail
+
+        candidate_arr = []
+
+        while True:
+            episode_arr = []
+            game = Game()
+
+            while not game.game_over():
+                action = action_callback(game)
+                state = np.matrix.flatten(game.state)
+                reward = game.do_action(action)
+                state_ = np.matrix.flatten(game.state)
+                episode_arr.append(
+                    episodes.Episode(
+                        state=state,
+                        next_state=state_,
+                        action=action,
+                        reward=reward,
+                        score=game.score,
+                        n_moves=game.move_count,
+                        done=game.game_over()
+                    )
+                )
+
+            top_cnt = max(game.score, top_cnt)
+
+            if top_cnt > prev_top_cnt:
+                candidate_arr = episode_arr.copy()
+
+                # Update scoresd in candidate_arr
+                for e in candidate_arr:
+                    e.score = top_cnt
+
+                prev_top_cnt = top_cnt
+                top_move_cnt = game.move_count
+
+            score_pass = self.game_qc(game)
+            replay_cnt += 1
+
+            if not record_in_episode_db:
+                break
+
+            if score_pass:
+                break
+
+            if not replay_on_fail:
+                break
+
+            if replay_on_fail and replay_cnt >= replay_lim:
+                break
+
+        if record_in_episode_db:
+            for e in candidate_arr:
+                self.episode_db.store_episode(e)
+
+        self.max_game_score = max(self.max_game_score, top_cnt)
+
+        if self.min_game_score == 0:
+            self.min_game_score = top_cnt
+        else:
+            self.min_game_score = min(self.min_game_score, top_cnt)
+
+        self.last_game_score = top_cnt
+        self.last_move_count = top_move_cnt
 
     def action_greedy_epsilon(self, game):
         if np.random.random() < self.adapt_epsilon():
@@ -257,7 +335,10 @@ class Agent:
             file_writer.set_as_default()
 
         for i in range(n_games):
-            self.play_game(self.action_greedy)
+            self.play_game(self.action_greedy,
+                           replay_on_fail=False,
+                           record_in_episode_db=False
+                           )
 
             if self.model_auto_save:
                 self.save_model()
