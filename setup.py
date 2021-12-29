@@ -26,7 +26,7 @@ setup(
         "Programming Language :: Python",
         'Programming Language :: Python :: 3.6',
     ],
-    long_description=read_file('README.md'),
+    long_description=read_file('README.rst'),
     entry_points={'console_scripts': [
         '2048-rl = py_2048_rl.console:main',
     ]},
