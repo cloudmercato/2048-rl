@@ -20,7 +20,11 @@ class Agent:
             batch_size=10000,
             mem_size=50000,
             input_dims=[16],
-            lr=0.001,
+            lr=0.0001,
+            lr_min=0.00001,
+            lr_redux=0.9,
+            lr_patience=2,
+            lr_verbose=2,
             gamma=0.99,
             gamma1=0.99,
             gamma2=0.99,
@@ -41,6 +45,10 @@ class Agent:
         self.mem_size = mem_size
         self.input_dims = input_dims[::]
         self.lr = lr
+        self.lr_min = lr_min
+        self.lr_redux = lr_redux
+        self.lr_patience = lr_patience
+        self.lr_verbose = lr_verbose
         self.gamma = gamma
         self.gamma1 = gamma1
         self.gamma2 = gamma2
@@ -96,7 +104,8 @@ class Agent:
         model = getattr(models, class_name)
         model.compile(
             optimizer=tf.keras.optimizers.Adam(learning_rate=self.lr),
-            loss='mean_squared_error'
+            loss='mean_squared_error',
+            metrics=[tf.keras.metrics.CategoricalAccuracy()]
         )
         return model
 
@@ -129,7 +138,14 @@ class Agent:
             )
         )
 
-        callbacks = []
+        callbacks = [tf.keras.callbacks.ReduceLROnPlateau(monitor='categorical_accuracy',
+                                                          factor=self.lr_redux,
+                                                          patience=self.lr_patience,
+                                                          min_lr=self.lr_min,
+                                                          verbose=self.lr_verbose
+                                                          )
+                    ]
+
         if self.log_dir:
             callbacks.append(self.tb_callback)
 

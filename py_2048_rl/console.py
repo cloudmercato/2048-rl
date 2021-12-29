@@ -20,6 +20,14 @@ parser.add_argument('--mem-size', type=int, default=50000,
                     help='Learning episode DB size (in number of episodes')
 parser.add_argument('--lr', type=float, default=0.0001,
                     help='Learning rate')
+parser.add_argument('--lr-min', type=float, default=0.00001,
+                    help='Learning rate: minimal value allowed in epochs')
+parser.add_argument('--lr-redux', type=float, default=0.9,
+                    help='Learning rate: per step reduction ratio')
+parser.add_argument('--lr-patience', type=int, default=2,
+                    help='Learning rate: number of epochs to wait before reducing LR')
+parser.add_argument('--lr-verbose', type=int, default=0,
+                    help='Learning rate: modification verbosity level')
 parser.add_argument('--gamma', type=float, default=0.99,
                     help='Gamma')
 parser.add_argument('--gamma1', type=float, default=0.99,
@@ -90,6 +98,10 @@ def main():
         # input_dims=args.input_dims,
         input_dims=[16],
         lr=args.lr,
+        lr_min=args.lr_min,
+        lr_redux=args.lr_redux,
+        lr_patience=args.lr_patience,
+        lr_verbose=args.lr_verbose,
         gamma=args.gamma,
         gamma1=args.gamma1,
         gamma2=args.gamma2,
