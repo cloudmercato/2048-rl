@@ -10,6 +10,7 @@ from py_2048_rl.agent import Agent
 logger = logging.getLogger('py2048')
 tf_logger = logging.getLogger('tensorflow')
 
+#Options definitions
 parser = argparse.ArgumentParser()
 parser.add_argument('action', default='train', choices=('train', 'infer'), nargs='?')
 parser.add_argument('--runs', type=int, default=100, help='Number of runs')
@@ -63,6 +64,15 @@ parser.add_argument('--tf-verbose', '-tfv', default=2, type=int)
 
 
 def main():
+    """Main routine
+
+    Two main invocation modes:
+    train: to train the model
+    infer: to use the model to play the game
+
+    Invoke with --help for details
+    """
+
     args = parser.parse_args()
 
     log_verbose = 60 - (args.verbose*10)
@@ -87,6 +97,7 @@ def main():
     if args.tf_profiler_port:
         tf.profiler.experimental.server.start(args.tf_profiler_port)
 
+    # Creating Agent instance to use throughout the execution.
     agent = Agent(
         batch_size=args.batch_size,
         mem_size=args.mem_size,

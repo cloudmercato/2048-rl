@@ -1,3 +1,9 @@
+"""Tensorflow model definitions
+
+Models available for use in 2048 RL modeling.
+Common characteristics: 16 inputs (representation of game state), 4 labels (representation of potential actions)
+"""
+
 import tensorflow as tf
 
 model_16_64_64_64_64_64_64_4_relu = tf.keras.models.Sequential([
