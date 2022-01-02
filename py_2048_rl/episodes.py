@@ -5,8 +5,17 @@ import tensorflow as tf
 
 logger = logging.getLogger('py2048')
 
-
 class Episode:
+    """Storage class designed to store a state of the environment
+
+    state: current state
+    next_state: the following state
+    action: the action/move
+    reward: reward resulting from move
+    score: total score in game thus far
+    n_moves: number of moves so far
+    done: True is game over, False otherwise
+    """
     def __init__(self, state, next_state, action, reward, score, n_moves, done, **kwargs):
         self.state = state
         self.next_state = next_state
@@ -16,9 +25,18 @@ class Episode:
         self.n_moves = n_moves
         self.done = done
 
-
 class EdpisodeDB:
+    """Collection of accrued Episode instances
+
+    Includes methods to access a random selection of entries for NN modeling.
+    """
+
     def __init__(self, mem_size, input_dims, **kwargs):
+        """Class initialization
+
+        Initializes the class instance of dimensions mem_size (stack ize)
+        x input_dims (the dimension/size of input, 16 for a game state)
+        """
         self.mem_size = mem_size
         self.mem_cntr = 0
         states_dims = [mem_size]
@@ -32,7 +50,11 @@ class EdpisodeDB:
         self.n_moves_mem = tf.Variable(np.zeros(mem_size, dtype=np.float32))
         self.done_mem = tf.Variable(np.zeros(mem_size, dtype=np.bool))
 
+
     def store_episode(self, e, **kwargs):
+        """Add an Episode instance to the database
+        """
+
         ind = self.mem_cntr % self.mem_size
         ind_arr = tf.Variable(tf.constant([
             [ind, 0], [ind, 1], [ind, 2], [ind, 3],
@@ -55,6 +77,8 @@ class EdpisodeDB:
         self.mem_cntr += 1
 
     def get_random_data_batch(self, batch_size):
+        """Return a random selection sorted by field.
+        """
         total_db_size = min(self.mem_cntr, self.mem_size)
         output_size = min(batch_size, total_db_size)
         batch_arr = np.random.choice(total_db_size, output_size, replace=False)

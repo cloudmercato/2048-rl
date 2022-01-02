@@ -11,10 +11,17 @@ logger = logging.getLogger('py2048')
 
 
 def random_action_callback(game):
+    """Returns a randomly selected valid action"""
     return np.random.choice(game.available_actions())
 
 
 class Agent:
+    """Agent class for Reinforcement Learning
+
+    Instance contains parameters and functionality to facilitate RL interaction with the environment which is the
+    2048 game. 2048 game is implemented by way of a py_2048_game.Game instance.
+    """
+
     def __init__(
             self,
             batch_size=10000,
@@ -39,8 +46,15 @@ class Agent:
             model_collect_random_data=True,
             log_dir="/tmp/",
             training_epochs=1,
+            game_qc_threshold=0.5,
+            game_max_replay_on_fail=50,
             **kwargs
         ):
+        """Agent instance initialization
+
+        Provides a functional instance with default settings.
+        """
+
         self.batch_size = batch_size
         self.mem_size = mem_size
         self.input_dims = input_dims[::]
@@ -63,6 +77,8 @@ class Agent:
         self.model_collect_random_data = model_collect_random_data
         self.log_dir = log_dir
         self.training_epochs = training_epochs
+        self.game_qc_threshold = game_qc_threshold
+        self.game_max_replay_on_fail = game_max_replay_on_fail
 
         self.episode_db = episodes.EdpisodeDB(
             self.mem_size,
@@ -89,8 +105,15 @@ class Agent:
         self.game_count = 0
         self.last_game_score = 0
         self.last_move_count = 0
+        self.q_val_opt_max=True
+        self.max_game_score = 0
+        self.min_game_score = 0
 
     def adapt_epsilon(self):
+        """Epsilon management function
+
+        Epsilon determines explore vs predict ratio.
+        """
         val = self.epsilon
         if self.epsilon > self.epsilon_min:
             self.epsilon = self.epsilon - self.epsilon_dec
@@ -98,6 +121,11 @@ class Agent:
         return val
 
     def _make_model(self):
+        """MNN Model creation logic
+
+        Creates a model as specified by the path, or DEFAULT.
+        The definitions are in models.py
+        """
         class_name = self.model_path.split('.')[-1]
         module_path = '.'.join([i for i in self.model_path.split('.')][:-1])
         models = importlib.import_module(module_path)
@@ -110,6 +138,8 @@ class Agent:
         return model
 
     def learn(self, run):
+        """Facilitates single learn (model training) run
+        """
         if self.model_collect_random_data:
             self.accumulate_episode_data()
 
@@ -124,6 +154,13 @@ class Agent:
         q_next = tf.Variable(self.model.predict(states_.numpy()))
         q_target = q_eval.numpy()
 
+        #
+        # Calculating Q-values
+        # Contributing factors: rewards, predicted score for the next state, number of moves in the game
+        # and score at the end of the game.
+        # The involvement of the next state encourages the model to design a path leading to the highest possible
+        # score at the end of the game and backtracking from that point.
+        #
         batch_index = np.arange(real_batch_size)
         q_target[batch_index, actions] = tf.math.l2_normalize(
             1/tf.math.exp(
@@ -161,10 +198,23 @@ class Agent:
         tf.summary.scalar('Game move', data=self.last_move_count, step=run)
         tf.summary.scalar('Epsilon', data=self.epsilon, step=run)
 
+        # Tensorboard tracking the metrics
         for name in history.history:
             tf.summary.scalar(name, data=history.history[name][-1], step=run)
 
+
     def learn_on_repeat(self, n_cycles=1, games_per_cycle=1, refill_episode_db=False):
+        """Facilitates multiple model training runs as specified.
+
+        parameters:
+        n_cycles: number of training cycles
+
+        games_per_cycle: the number of games to play between two successive cycles
+
+        refill_episode_db: play enough games between two successive cycles to fully replace the whole EpisodeDB
+        if set to True
+        """
+
         min_score = 0
         max_score = 0
         sum_scores = 0
@@ -216,7 +266,13 @@ class Agent:
         if self.log_dir:
             file_writer.close()
 
+
     def accumulate_episode_data(self):
+        """"Fills instance's EpisodeDB instance with data.
+
+         Collects random environment/game data.
+         """
+
         # Bail if there's nothing to do.
         if self.episode_db.mem_cntr >= self.batch_size:
             return
@@ -224,38 +280,135 @@ class Agent:
         logger.debug("Initial data accumulation. Collection size = %s episodes.",
                      self.mem_size)
         while self.episode_db.mem_cntr < self.batch_size:
-            self.play_game(random_action_callback)
+            self.play_game(random_action_callback, replay_on_fail=False)
         logger.debug("Initial data accumulation completed.")
 
-    def play_game(self, action_callback):
-        game = Game()
+    def game_qc(self, game):
+        """Game quality control
 
-        while not game.game_over():
-            action = action_callback(game)
-            state = np.matrix.flatten(game.state)
-            reward = game.do_action(action)
-            state_ = np.matrix.flatten(game.state)
-            episode = episodes.Episode(
-                state=state,
-                next_state=state_,
-                action=action,
-                reward=reward,
-                score=game.score,
-                n_moves=game.move_count,
-                done=game.game_over()
-            )
-            self.episode_db.store_episode(episode)
+         Takes an instance of Game as argument.
+         Returns False (fail) if the score in that game is below the game_qc_threshold multiplied
+         by the the maximum game score obtained thus far.
+         Otherwise, returns True.
 
-        self.last_game_score = game.score
-        self.last_move_count = game.move_count
+         Example: the highest score attained thus far is 10,000. A new game has just been concluded. The score
+         in that game is 6,000. This game is accepted.
+
+         Example: the highest score attained thus far is 10,000. A new game has just been concluded. The score
+         in that game is 4,000. This game is rejected.
+         """
+        if game.score < self.game_qc_threshold * self.max_game_score:
+            return False
+
+        return True
+
+
+    def play_game(self,
+                  action_callback,
+                  replay_on_fail=True,
+                  max_replays=0,
+                  record_in_episode_db=True
+                  ):
+        """Execute a full game fitting for data collection
+
+         Arguments:
+
+         action_callback: the function that takes a Game() instance as an argument and returns a next move (action)
+         recommendation
+
+         replay_on_fail: if True replay until the Game instance resulting passes quality control, for no more than the
+         prescribed number of tries.
+         """
+
+        replay_cnt = 0
+        top_cnt = 0
+        prev_top_cnt = 0
+        top_move_cnt = 0
+
+        replay_lim = max_replays
+
+        #
+        # Defaulting to self.game_max_replay_on_fail
+        # ig max_replays not specified.
+        #
+        if max_replays == 0:
+            replay_lim = self.game_max_replay_on_fail
+
+        if replay_on_fail and replay_lim == 0:
+            replay_lim = self.game_max_replay_on_fail
+
+        candidate_arr = []
+
+        while True:
+            episode_arr = []
+            game = Game()
+
+            while not game.game_over():
+                action = action_callback(game)
+                state = np.matrix.flatten(game.state)
+                reward = game.do_action(action)
+                state_ = np.matrix.flatten(game.state)
+                episode_arr.append(
+                    episodes.Episode(
+                        state=state,
+                        next_state=state_,
+                        action=action,
+                        reward=reward,
+                        score=game.score,
+                        n_moves=game.move_count,
+                        done=game.game_over()
+                    )
+                )
+
+            top_cnt = max(game.score, top_cnt)
+
+            if top_cnt > prev_top_cnt:
+                candidate_arr = episode_arr.copy()
+                prev_top_cnt = top_cnt
+                top_move_cnt = game.move_count
+
+            replay_cnt += 1
+
+            # Exiting the cycle once the game passes game_qc
+            # or if the quality control is not required
+            # or database recording is not requested
+            # or the replay limit is reached
+            if not record_in_episode_db or \
+                    not replay_on_fail or \
+                    self.game_qc(game) or \
+                    replay_cnt >= replay_lim:
+                break
+
+        if record_in_episode_db:
+            for e in candidate_arr:
+                self.episode_db.store_episode(e)
+
+        self.max_game_score = max(self.max_game_score, top_cnt)
+
+        if self.min_game_score == 0:
+            self.min_game_score = top_cnt
+        else:
+            self.min_game_score = min(self.min_game_score, top_cnt)
+
+        self.last_game_score = top_cnt
+        self.last_move_count = top_move_cnt
 
     def action_greedy_epsilon(self, game):
+        """Random selection with the probability of epsilon
+
+        Greedy (most profitable) action otherwise.
+        """
+
         if np.random.random() < self.adapt_epsilon():
             return random_action_callback(game)
 
         return self.action_greedy(game)
 
     def action_greedy(self, game):
+        """Greedy (most profitable) game action selection.
+
+         NN model prediction is used ass a presumed best selection.
+         """
         state = game.state
         state = np.matrix.reshape(state, (1, 16))
 
@@ -264,6 +417,9 @@ class Agent:
         return avai_actions[np.argmin(pred_actions[avai_actions])]
 
     def play_on_repeat(self, n_games=1):
+        """Execute the number of games as specified by n_games
+        """
+
         min_score = 0
         max_score = 0
         sum_scores = 0
@@ -273,7 +429,10 @@ class Agent:
             file_writer.set_as_default()
 
         for i in range(n_games):
-            self.play_game(self.action_greedy)
+            self.play_game(self.action_greedy,
+                           replay_on_fail=False,
+                           record_in_episode_db=False
+                           )
 
             if self.model_auto_save:
                 self.save_model()
@@ -299,11 +458,18 @@ class Agent:
             file_writer.close()
 
     def save_model(self):
+        """Save current model to a file
+         """
         self.model.save(self.model_save_file)
 
+
     def load_model(self):
+        """Load a model in from file
+        """
         return tf.keras.models.load_model(self.model_load_file)
 
 
 def get_default_agent(env):
+    """Obtain an Agent instance defined by env
+    """
     return Agent(**env)
