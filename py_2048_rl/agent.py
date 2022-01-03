@@ -107,6 +107,7 @@ class Agent:
             self.model = self._make_model()
 
         self.game_count = 0
+        self.infer_game_count = 0
         self.last_game_score = 0
         self.last_move_count = 0
 
@@ -263,7 +264,12 @@ class Agent:
             tf.summary.scalar(name, data=history.history[name][-1], step=run)
 
 
-    def learn_on_repeat(self, n_cycles=1, games_per_cycle=1, refill_episode_db=False):
+    def learn_on_repeat(self,
+                        n_cycles=1,
+                        games_per_cycle=1,
+                        refill_episode_db=False,
+                        inference_on_learn=False
+                        ):
         """Facilitates multiple model training runs as specified.
 
         parameters:
@@ -288,6 +294,11 @@ class Agent:
 
             if self.model_auto_save:
                 self.save_model()
+
+            # Playing an inference game if required to.
+            if inference_on_learn:
+                self.play_on_repeat(tb_logging=False)
+                tf.summary.scalar('Game score (inference)', data=self.last_game_score, step=self.infer_game_count)
 
             episode_count = 0
             cycle_game_count = 0
@@ -477,7 +488,7 @@ class Agent:
         sel_f = self.arg_sel_func()
         return avai_actions[sel_f(pred_actions[avai_actions])]
 
-    def play_on_repeat(self, n_games=1):
+    def play_on_repeat(self, n_games=1, tb_logging=True, record_in_episode_db=False, replay_on_fail=False):
         """Execute the number of games as specified by n_games
         """
 
@@ -485,18 +496,17 @@ class Agent:
         max_score = 0
         sum_scores = 0
 
-        if self.log_dir:
+        if self.log_dir and tb_logging:
             file_writer = tf.summary.create_file_writer(self.log_dir)
             file_writer.set_as_default()
 
         for i in range(n_games):
             self.play_game(self.action_greedy,
-                           replay_on_fail=False,
-                           record_in_episode_db=False
+                           record_in_episode_db=record_in_episode_db,
+                           replay_on_fail=replay_on_fail
                            )
 
-            if self.model_auto_save:
-                self.save_model()
+            self.infer_game_count += 1
 
             if i == 0:
                 min_score = self.last_game_score
@@ -510,12 +520,10 @@ class Agent:
             logger.info('Step %d: min=%s avg=%s last=%s max=%s',
                         i, min_score, avg_score, self.last_game_score, max_score)
 
-            if self.log_dir:
-                tf.summary.scalar('Game move (inference)', data=self.last_move_count, step=i)
-                tf.summary.scalar('Game score (inference)', data=self.last_game_score, step=i)
-                file_writer.flush()
+            if self.log_dir and tb_logging:
+                tf.summary.scalar('Game score (inference)', data=self.last_game_score, step=self.infer_game_count)
 
-        if self.log_dir:
+        if self.log_dir and tb_logging:
             file_writer.close()
 
     def save_model(self):
