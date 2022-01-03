@@ -36,6 +36,8 @@ class Agent:
             gamma1=0.99,
             gamma2=0.99,
             gamma3=0.99,
+            min_base=1e-06,
+            q_base=1.0,
             epsilon=1,
             epsilon_dec=1e-3,
             epsilon_min=0.01,
@@ -67,6 +69,8 @@ class Agent:
         self.gamma1 = gamma1
         self.gamma2 = gamma2
         self.gamma3 = gamma3
+        self.min_base = min_base
+        self.q_base = q_base
         self.epsilon = epsilon
         self.epsilon_dec = epsilon_dec
         self.epsilon_min = epsilon_min
@@ -105,7 +109,11 @@ class Agent:
         self.game_count = 0
         self.last_game_score = 0
         self.last_move_count = 0
+
+        # Determines whether Q-values are to be maximum-bound or minimum-bound
+        # only maximum-bound supported at this point.
         self.q_val_opt_max=True
+
         self.max_game_score = 0
         self.min_game_score = 0
 
@@ -119,6 +127,24 @@ class Agent:
             self.epsilon = self.epsilon - self.epsilon_dec
 
         return val
+
+    def arg_sel_func(self):
+        """Returns appropriate function for label selection based on Q-value
+
+        argmax is maximum bound, argmin if minimum bound
+        """
+        if self.q_val_opt_max:
+            return np.argmax
+        return np.argmin
+
+    def get_q_mod_func(self):
+        """Returns appropriate function for Q-value data prep function
+
+        Maximum-based for maximum bound calculation, minimum-based for minimum bound.
+        """
+        if self.q_val_opt_max:
+            return self.get_modeling_data_q_max
+        return self.get_modeling_data_q_min
 
     def _make_model(self):
         """MNN Model creation logic
@@ -137,43 +163,77 @@ class Agent:
         )
         return model
 
-    def learn(self, run):
-        """Facilitates single learn (model training) run
+    def get_modeling_data_q_min(self):
+        """Returns data for model training (states and labels) for minimum-bound calculation
+
+        Factors involved: reward, next state prediction, ongoing score, game score, number of actions in game.
         """
-        if self.model_collect_random_data:
-            self.accumulate_episode_data()
-
-        # Exit if no data to learn from
+        # Return None if there is no data to learn from
         if self.episode_db.mem_cntr == 0:
-            return
+            return None, None
 
-        real_batch_size, states, states_, actions, rewards, scores, n_moves, dones = \
+        sel_size, states, states_, actions, rewards, scores, n_moves, dones = \
             self.episode_db.get_random_data_batch(self.batch_size)
 
         q_eval = tf.Variable(self.model.predict(states.numpy()))
         q_next = tf.Variable(self.model.predict(states_.numpy()))
         q_target = q_eval.numpy()
 
-        #
-        # Calculating Q-values
-        # Contributing factors: rewards, predicted score for the next state, number of moves in the game
-        # and score at the end of the game.
-        # The involvement of the next state encourages the model to design a path leading to the highest possible
-        # score at the end of the game and backtracking from that point.
-        #
-        batch_index = np.arange(real_batch_size)
-        q_target[batch_index, actions] = tf.math.l2_normalize(
-            1/tf.math.exp(
-                tf.math.l2_normalize(
-                    rewards +
-                    self.gamma * np.max(q_next, axis=1) +
-                    self.gamma1 * scores.numpy() +
-                    self.gamma2 * scores.numpy() *
-                    dones.numpy() +
-                    self.gamma3 * n_moves.numpy()
-                )
-            )
+        batch_index = np.arange(sel_size)
+        q_target[batch_index, actions] = 1/(
+            self.q_base +
+            rewards +
+            self.gamma *
+            1/(self.min_base + np.min(q_next, axis=1)) +
+            self.gamma1 * scores.numpy() +
+            self.gamma2 * scores.numpy() *
+            dones.numpy() +
+            self.gamma3 * n_moves.numpy()
         )
+
+        return states, q_target
+
+    def get_modeling_data_q_max(self):
+        """Returns data for model training (states and labels) for maximum-bound calculation
+
+        Factors in the formula: reward, next state prediction, max tile base 2 exp. value, end game score,
+        number of empty tiles.
+        """
+        # Return None if there is no data to learn from
+        if self.episode_db.mem_cntr == 0:
+            return None, None
+
+        sel_size, states, states_, actions, rewards, scores, n_moves, dones = \
+            self.episode_db.get_random_data_batch(self.batch_size)
+
+        q_eval = tf.Variable(self.model.predict(states.numpy()))
+        q_next = tf.Variable(self.model.predict(states_.numpy()))
+        q_target = q_eval.numpy()
+
+        batch_index = np.arange(sel_size)
+        q_target[batch_index, actions] = tf.math.l2_normalize(
+            self.q_base +
+            rewards +
+            self.gamma * np.max(q_next, axis=1) +
+            self.gamma1 * tf.math.reduce_sum(tf.cast(tf.equal(states, 0), tf.int32), axis=1
+                                             ).numpy() +
+            self.gamma2 * scores.numpy() * dones.numpy() +
+            self.gamma3 * np.max(states, axis=1)
+        )
+
+        return states, q_target
+
+    def learn(self, run):
+        """Facilitates single learn (model training) run
+        """
+        if self.model_collect_random_data:
+            self.accumulate_episode_data()
+
+        q_mod_func = self.get_q_mod_func()
+        states, q_target = q_mod_func()
+
+        if q_target is None:
+            return
 
         callbacks = [tf.keras.callbacks.ReduceLROnPlateau(monitor='categorical_accuracy',
                                                           factor=self.lr_redux,
@@ -414,7 +474,8 @@ class Agent:
 
         pred_actions = self.model.predict(state)[0]
         avai_actions = game.available_actions()
-        return avai_actions[np.argmin(pred_actions[avai_actions])]
+        sel_f = self.arg_sel_func()
+        return avai_actions[sel_f(pred_actions[avai_actions])]
 
     def play_on_repeat(self, n_games=1):
         """Execute the number of games as specified by n_games
