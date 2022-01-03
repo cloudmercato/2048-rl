@@ -61,6 +61,8 @@ parser.add_argument('--disable-collect-random-data', default=True, action="store
                     dest="model_collect_random_data")
 parser.add_argument('--refill-episode-db', default=False, action="store_true",
                     dest="refill_episode_db")
+parser.add_argument('--no-inference-on-learn', default=True, action="store_false",
+                    dest="inference_on_learn")
 parser.add_argument('--log-dir', default=None,
                     help='Tensorboard log directory')
 parser.add_argument('--tf-log-device', default=False, action="store_true",
@@ -137,7 +139,8 @@ def main():
     if args.action == 'train':
         agent.learn_on_repeat(n_cycles=args.runs,
                               games_per_cycle=args.games_per_cycle,
-                              refill_episode_db=args.refill_episode_db
+                              refill_episode_db=args.refill_episode_db,
+                              inference_on_learn=args.inference_on_learn
                               )
 
     elif args.action == 'infer':
