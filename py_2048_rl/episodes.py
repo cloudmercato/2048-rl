@@ -1,9 +1,32 @@
-import logging
+"""EpisodeDB package
 
-import numpy as np
+Maintains the game data for modeling.
+"""
+import logging
 import tensorflow as tf
 
 logger = logging.getLogger('py2048')
+
+# Data record structure
+# We use a single tensor to store all the data.
+# Positions:
+# state -> 0-15
+# next_state -> 16-31
+# action -> 32
+# reward -> 33
+# score -> 34
+# n_moves -> 35
+# done -> 36
+# All fields recorded as int32
+DATA_REC_SIZE = 37
+STATE_REC_SIZE = 16
+STATE_POS = 0
+NEW_STATE_POS = 16
+ACTION_POS = 32
+REWARD_POS = 33
+SCORE_POS = 34
+N_MOVES_POS = 35
+DONE_POS = 36
 
 class Episode:
     """Storage class designed to store a state of the environment
@@ -17,14 +40,25 @@ class Episode:
     done: True is game over, False otherwise
     """
     def __init__(self, state, next_state, action, reward, score, n_moves, done, **kwargs):
-        self.state = state
-        self.next_state = next_state
-        self.action = action
-        self.reward = reward
-        self.score = score
-        self.n_moves = n_moves
-        self.done = done
+        self.state = tf.reshape(tf.Variable(state, dtype=tf.int32), shape=(STATE_REC_SIZE,))
+        self.next_state = tf.reshape(tf.Variable(next_state, dtype=tf.int32), shape=(STATE_REC_SIZE,))
+        self.action = tf.Variable(action, dtype=tf.int32)
+        self.reward = tf.Variable(reward, dtype=tf.int32)
+        self.score = tf.Variable(score, dtype=tf.int32)
+        self.n_moves = tf.Variable(n_moves, dtype=tf.int32)
+        self.done = tf.cast(done, dtype=tf.int32)
 
+    def get_content_tensor(self):
+        return tf.concat([self.state,
+                          self.next_state,
+                          [self.action],
+                          [self.reward],
+                          [self.score],
+                          [self.n_moves],
+                          [self.done]
+                          ],
+                        0
+                       )
 class EdpisodeDB:
     """Collection of accrued Episode instances
 
@@ -37,58 +71,39 @@ class EdpisodeDB:
         Initializes the class instance of dimensions mem_size (stack ize)
         x input_dims (the dimension/size of input, 16 for a game state)
         """
-        self.mem_size = mem_size
-        self.mem_cntr = 0
-        states_dims = [mem_size]
-        states_dims.extend(input_dims)
-        self.states_mem = tf.Variable(np.zeros(states_dims, np.float32))
-        self.new_states_mem = tf.Variable(np.zeros(states_dims, np.float32))
 
-        self.action_mem = tf.Variable(np.zeros(mem_size, dtype=np.int32))
-        self.reward_mem = tf.Variable(np.zeros(mem_size, dtype=np.float32))
-        self.score_mem = tf.Variable(np.zeros(mem_size, dtype=np.float32))
-        self.n_moves_mem = tf.Variable(np.zeros(mem_size, dtype=np.float32))
-        self.done_mem = tf.Variable(np.zeros(mem_size, dtype=np.bool))
-
+        self.mem_size = tf.Variable(mem_size, dtype=tf.int32)
+        self.storage = tf.zeros(shape=(0,DATA_REC_SIZE), dtype=tf.int32)
 
     def store_episode(self, e, **kwargs):
         """Add an Episode instance to the database
         """
 
-        ind = self.mem_cntr % self.mem_size
-        ind_arr = tf.Variable(tf.constant([
-            [ind, 0], [ind, 1], [ind, 2], [ind, 3],
-            [ind, 4], [ind, 5], [ind, 6], [ind, 7],
-            [ind, 8], [ind, 9], [ind, 10], [ind, 11],
-            [ind, 12], [ind, 13], [ind, 14], [ind, 15]
-        ]))
+        # Shedding the last slice if storage is full.
+        if self.storage.shape[0] == self.mem_size:
+            self.storage = tf.slice(self.storage,
+                                    [0, 0],
+                                    [self.mem_size - 1, DATA_REC_SIZE]
+                                    )
 
-        self.states_mem.scatter_nd_update(ind_arr, tf.constant(e.state, dtype=tf.float32))
-        self.new_states_mem.scatter_nd_update(ind_arr, tf.constant(e.next_state, dtype=tf.float32))
-        self.action_mem.scatter_nd_update([ind], [e.action])
-        self.reward_mem.scatter_nd_update([ind], [e.reward])
-        self.score_mem.scatter_nd_update([ind], [e.score])
-
-        # Special processing for boolean in done_mem
-        done_mem_np = self.done_mem.numpy()
-        done_mem_np[ind] = e.done
-        self.done_mem = tf.Variable(done_mem_np)
-
-        self.mem_cntr += 1
+        self.storage = tf.concat([[e.get_content_tensor()], self.storage], 0)
 
     def get_random_data_batch(self, batch_size):
-        """Return a random selection sorted by field.
+        """Return a random selection out of the data tensor.
         """
-        total_db_size = min(self.mem_cntr, self.mem_size)
-        output_size = min(batch_size, total_db_size)
-        batch_arr = np.random.choice(total_db_size, output_size, replace=False)
-        states_batch = tf.Variable(self.states_mem.numpy()[batch_arr])
-        new_states_batch = tf.Variable(self.new_states_mem.numpy()[batch_arr])
-        action_batch = tf.Variable(self.action_mem.numpy()[batch_arr])
-        reward_batch = tf.Variable(self.reward_mem.numpy()[batch_arr])
-        score_batch = tf.Variable(self.score_mem.numpy()[batch_arr])
-        n_moves_batch = tf.Variable(self.n_moves_mem.numpy()[batch_arr])
-        done_batch = tf.Variable(self.done_mem.numpy()[batch_arr])
+        if batch_size >= self.storage.shape[0]:
+            return tf.Variable(self.storage)
 
-        return output_size, states_batch, new_states_batch, action_batch, reward_batch, \
-               score_batch, n_moves_batch, done_batch
+        sel_range_matrix = tf.reshape(tf.cast(tf.range(self.storage.shape[0]),
+                                              dtype=tf.int64
+                                              ),
+                                      [1, self.storage.shape[0]]
+                                      )
+
+        sel_index = tf.random.uniform_candidate_sampler(sel_range_matrix, self.storage.shape[0],
+                                                        batch_size,
+                                                        True,
+                                                        self.storage.shape[0]
+                                                        )[0]
+
+        return tf.gather(self.storage, sel_index)
