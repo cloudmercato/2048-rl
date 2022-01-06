@@ -5,7 +5,7 @@ import tensorflow as tf
 import numpy as np
 
 from py_2048_game import Game
-from py_2048_rl import episodes
+from py_2048_rl import episodes as eps
 
 logger = logging.getLogger('py2048')
 
@@ -84,7 +84,7 @@ class Agent:
         self.game_qc_threshold = game_qc_threshold
         self.game_max_replay_on_fail = game_max_replay_on_fail
 
-        self.episode_db = episodes.EdpisodeDB(
+        self.episode_db = eps.EdpisodeDB(
             self.mem_size,
             self.input_dims,
         )
@@ -169,11 +169,21 @@ class Agent:
         Factors involved: reward, next state prediction, ongoing score, game score, number of actions in game.
         """
         # Return None if there is no data to learn from
-        if self.episode_db.mem_cntr == 0:
+        if self.episode_db.storage.shape[0] == 0:
             return None, None
 
-        sel_size, states, states_, actions, rewards, scores, n_moves, dones = \
-            self.episode_db.get_random_data_batch(self.batch_size)
+        data_batch = self.episode_db.get_random_data_batch(self.batch_size)
+        sel_size = data_batch.shape[0]
+        states = tf.cast(tf.slice(data_batch, [0, eps.STATE_POS], [sel_size, eps.STATE_REC_SIZE]), dtype=tf.float32)
+        states_ = tf.cast(tf.slice(data_batch, [0, eps.NEW_STATE_POS], [sel_size, eps.STATE_REC_SIZE]),
+                          dtype=tf.float32
+                          )
+
+        actions = tf.slice(data_batch, [0, eps.ACTION_POS], [sel_size, 1])
+        rewards = tf.cast(tf.slice(data_batch, [0, eps.REWARD_POS], [sel_size, 1]), dtype=tf.float32)
+        scores = tf.cast(tf.slice(data_batch, [0, eps.SCORE_POS], [sel_size, 1]), dtype=tf.float32)
+        n_moves = tf.cast(tf.slice(data_batch, [0, eps.N_MOVES_POS], [sel_size, 1]), dtype=tf.float32)
+        dones = tf.cast(tf.slice(data_batch, [0, eps.DONE_POS], [sel_size, 1]), dtype=tf.float32)
 
         q_eval = tf.Variable(self.model.predict(states.numpy()))
         q_next = tf.Variable(self.model.predict(states_.numpy()))
@@ -184,12 +194,14 @@ class Agent:
             self.q_base +
             rewards +
             self.gamma *
-            1/(self.min_base + np.min(q_next, axis=1)) +
-            self.gamma1 * scores.numpy() +
-            self.gamma2 * scores.numpy() *
-            dones.numpy() +
-            self.gamma3 * n_moves.numpy()
+            1/(self.min_base + tf.reduce_min(q_next, axis=1)) +
+            self.gamma1 * scores +
+            self.gamma2 * scores *
+            dones +
+            self.gamma3 * n_moves
         )
+
+        q_target = tf.Variable(q_target)
 
         return states, q_target
 
@@ -200,26 +212,37 @@ class Agent:
         number of empty tiles.
         """
         # Return None if there is no data to learn from
-        if self.episode_db.mem_cntr == 0:
+        if self.episode_db.storage.shape[0] == 0:
             return None, None
 
-        sel_size, states, states_, actions, rewards, scores, n_moves, dones = \
-            self.episode_db.get_random_data_batch(self.batch_size)
+        data_batch = self.episode_db.get_random_data_batch(self.batch_size)
+        sel_size = data_batch.shape[0]
+        states = tf.cast(tf.slice(data_batch, [0, eps.STATE_POS], [sel_size, eps.STATE_REC_SIZE]), dtype=tf.float32)
+        states_ = tf.cast(tf.slice(data_batch, [0, eps.NEW_STATE_POS], [sel_size, eps.STATE_REC_SIZE]),
+                          dtype=tf.float32
+                          )
 
-        q_eval = tf.Variable(self.model.predict(states.numpy()))
-        q_next = tf.Variable(self.model.predict(states_.numpy()))
+        actions = tf.slice(data_batch, [0, eps.ACTION_POS], [sel_size, 1])
+        rewards = tf.cast(tf.slice(data_batch, [0, eps.REWARD_POS], [sel_size, 1]), dtype=tf.float32)
+        scores = tf.cast(tf.slice(data_batch, [0, eps.SCORE_POS], [sel_size, 1]), dtype=tf.float32)
+        n_moves = tf.cast(tf.slice(data_batch, [0, eps.N_MOVES_POS], [sel_size, 1]), dtype=tf.float32)
+        dones = tf.cast(tf.slice(data_batch, [0, eps.DONE_POS], [sel_size, 1]), dtype=tf.float32)
+
+        q_eval = tf.Variable(self.model.predict(states))
+        q_next = tf.Variable(self.model.predict(states_))
         q_target = q_eval.numpy()
 
-        batch_index = np.arange(sel_size)
-        q_target[batch_index, actions] = tf.math.l2_normalize(
+        q_target[np.arange(sel_size), actions] = tf.math.l2_normalize(
             self.q_base +
             rewards +
-            self.gamma * np.max(q_next, axis=1) +
-            self.gamma1 * tf.math.reduce_sum(tf.cast(tf.equal(states, 0), tf.int32), axis=1
-                                             ).numpy() +
-            self.gamma2 * scores.numpy() * dones.numpy() +
-            self.gamma3 * np.max(states, axis=1)
+            self.gamma * tf.reduce_max(q_next, axis=1) +
+            self.gamma1 * tf.math.reduce_sum(tf.cast(tf.equal(states, 0), tf.float32), axis=1
+                                             ) +
+            self.gamma2 * scores * dones +
+            self.gamma3 * tf.reduce_max(states, axis=1)
         )
+
+        q_target = tf.Variable(q_target)
 
         return states, q_target
 
@@ -248,7 +271,7 @@ class Agent:
 
         history = self.model.fit(
             states.numpy(),
-            q_target,
+            q_target.numpy(),
             callbacks=callbacks,
             epochs=self.training_epochs
         )
@@ -334,12 +357,12 @@ class Agent:
          """
 
         # Bail if there's nothing to do.
-        if self.episode_db.mem_cntr >= self.batch_size:
+        if self.episode_db.storage.shape[0] >= self.mem_size:
             return
 
         logger.debug("Initial data accumulation. Collection size = %s episodes.",
                      self.mem_size)
-        while self.episode_db.mem_cntr < self.batch_size:
+        while self.episode_db.storage.shape[0] < self.mem_size:
             self.play_game(random_action_callback, replay_on_fail=False)
         logger.debug("Initial data accumulation completed.")
 
@@ -409,7 +432,7 @@ class Agent:
                 reward = game.do_action(action)
                 state_ = np.matrix.flatten(game.state)
                 episode_arr.append(
-                    episodes.Episode(
+                    eps.Episode(
                         state=state,
                         next_state=state_,
                         action=action,
